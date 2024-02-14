@@ -3,7 +3,7 @@
 set -e
 
 repo_root="$(git rev-parse --show-toplevel)"
-dockerfile="$repo_root/camsat_v2/docker/Dockerfile"
+dockerfile="$repo_root/docker/Dockerfile"
 
 proxy="http://web-proxy.corp.hpecorp.net:8080"
 

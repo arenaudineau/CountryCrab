@@ -37,7 +37,7 @@ RUN apt-get install -y \
 WORKDIR /tmp
 
 # install dependencies from requirements.txt
-COPY camsat_v2/requirements.txt .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 RUN rm -rf /tmp/*
@@ -45,7 +45,7 @@ WORKDIR /
 
 # copy server config and install TLS certificates
 WORKDIR /etc/jupyter
-COPY camsat_v2/docker/jupyter/jupyter_lab_config.py .
+COPY docker/jupyter/jupyter_lab_config.py .
 
 WORKDIR /etc/certs
 RUN openssl genpkey -algorithm RSA -out jupyter.key
@@ -53,7 +53,7 @@ RUN openssl req -new -key jupyter.key -out jupyter.csr -subj "/CN=localhost"
 RUN openssl x509 -req -days 365 -in jupyter.csr -signkey jupyter.key -out jupyter.crt
 
 # store user settings here, `dockerctl` can later move them to the correct user's home
-COPY camsat_v2/docker/jupyter/settings /var/jupyter-settings
+COPY docker/jupyter/settings /var/jupyter-settings
 
 WORKDIR /
 
