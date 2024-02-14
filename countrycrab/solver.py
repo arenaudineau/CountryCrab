@@ -36,7 +36,7 @@ def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # noise is the standard deviation of noise applied to the make_values
     noise = config.get("noise", 0.5)
     # noise profile
-    noise_dist = confif.get("noise_distribution",'normal')
+    noise_dist = config.get("noise_distribution",'normal')
     # target_probability
     p_solve = config.get("p_solve", 0.99)
     # task is the type of task to be performed
