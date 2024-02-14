@@ -1,0 +1,10 @@
+jupyterlab
+numpy
+scipy
+pandas
+matplotlib
+mlflow
+python-sat==0.1.7.DEV20
+mlflow
+ray
+campie[cu12x]
