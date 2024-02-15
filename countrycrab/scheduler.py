@@ -10,37 +10,36 @@ from ray import tune
 from ray.air import RunConfig
 from compiler import get_instance_names
 from solver import camsat
+import json
 
 
-def schedule(scheduler_name: t.Optional[str] = None) -> None:
-    path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
-    I_V_opt, I_V_final = get_instance_names(path,k=3)
-    I_V_final_flat = [item for sublist in list(I_V_final.values()) for item in sublist]
-    # test only size 20
-    #instance_list = I_V_final[20]      
+def schedule(scheduler_name: t.Optional[str] = None) -> None:     
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    instance_list = config["instance_list"]
+
+    # the only search space parameters are the instances in the case of the scheduler
     search_space = {
-        "instance": tune.grid_search(I_V_final_flat),
-        #"instance": tune.grid_search(instance_list),
+        "instance": tune.grid_search(instance_list),
     }
 
     resources_per_trial = {'gpu':0.2}
     objective_fn = tune.with_resources(camsat, resources_per_trial)
     # Need this to log RayTune artifacts into MLflow runs' artifact store.
     run_config = RunConfig(
-        name = 'exp2_3sat_uniform',
+        name = config["experiment_name"],
         local_dir=local_file_uri_to_path(mlflow.active_run().info.artifact_uri),
         log_to_file=True,
     )
-
     tuner = tune.Tuner(
         
         tune.with_parameters(
             objective_fn,
-            params={'max_runs': 1000, 'batch_size': 1, 'task': 'solve','hp_location':'/home/pedretti/projects/camsat/camsat_v2/data/experiments/f2f_hpo_3SAT.csv'}
+            params=config
         ),
         # Tuning configuration.
         tune_config=tune.TuneConfig(
-            metric="tts_median",
+            metric="its",
             mode="min",
             num_samples=1,
         ),

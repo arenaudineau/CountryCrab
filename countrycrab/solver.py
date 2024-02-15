@@ -21,10 +21,18 @@ def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         )
     # get configuration. This is part of the scheduler search space
     instance_addr = config["instance"]
+    # noise is the standard deviation of noise applied to the make_values
+    noise = config.get("noise", 0.5)
+
+    # load instance and map it to the CAMSAT arrays
+    tcam_array, ram_array = map_camsat(instance_addr)
+    clauses = tcam_array.shape[0]
+    variables = tcam_array.shape[1]
+
     # number of clauses that can map to each core
-    n_words = config.get("n_words", clauses)
+    n_words = params.get("n_words", clauses)
     # total number of cores
-    n_cores = config.get("n_cores", 1)
+    n_cores = params.get("n_cores", 1)
     
     # get parameters. This should be "fixed values"
     # max runs is the number of parallel initialization (different inputs)
@@ -33,19 +41,14 @@ def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     max_flips = params.get("max_flips", 1000)
     # scheduling is the way the cores are used
     scheduling = params.get("scheduling", "fill_first")
-    # noise is the standard deviation of noise applied to the make_values
-    noise = config.get("noise", 0.5)
     # noise profile
-    noise_dist = config.get("noise_distribution",'normal')
+    noise_dist = params.get("noise_distribution",'normal')
     # target_probability
-    p_solve = config.get("p_solve", 0.99)
+    p_solve = params.get("p_solve", 0.99)
     # task is the type of task to be performed
     task = params.get("task", "debug")
 
-    # load instance and map it to the CAMSAT arrays
-    tcam_array, ram_array = map_camsat(instance_addr)
-    clauses = tcam_array.shape[0]
-    variables = tcam_array.shape[1]
+
 
     # generate random inputs
     inputs = cp.random.randint(2, size=(max_runs, variables)).astype(cp.float32)
