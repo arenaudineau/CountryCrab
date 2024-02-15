@@ -13,61 +13,20 @@ from solver import camsat
 from ray.tune import Callback
 from ray.tune.experiment import Trial
 from enum import Enum
+import json
+import argparse
 
 
-class Mode(Enum):
-    MIN = 'min'
-    MAX = 'max'
-
-
-class MLflowCallback(Callback):
-    """A callback that Ray Tune can use to report progress to MLflow.
-
-    Usage example:
-    >>> run_config = RunConfig(
-    ...     local_dir='ray_results',
-    ...     callbacks=[MLflowCallback('eval_loss', Mode.MIN)]
-    ... )
-
-    Args:
-        metric: Metric that is being optimized.
-        mode: Either this metric should be minimized or maximized.
-    """
-
-    def __init__(self, metric: str, mode: Mode) -> None:
-        super().__init__()
-        self.metric = metric
-        self.mode = mode
-        self.best_value: t.Optional = None
-        self.trial_index = 0
-
-    def on_trial_result(self, iteration: int, trials: t.List[Trial], trial: Trial, result: t.Dict, **info) -> None:
-        self.trial_index += 1
-        value = result[self.metric]
-        mlflow.log_metric(self.metric, value, self.trial_index)
-
-        if self.best_value is None:
-            self.best_value = value
-        elif self.mode == Mode.MIN:
-            self.best_value = min(self.best_value, value)
-        else:
-            self.best_value = max(self.best_value, value)
-        mlflow.log_metric(f'best_{self.metric}', self.best_value, self.trial_index)
-
-        mlflow.log_metric('trial_time_s', result['time_total_s'], self.trial_index)
-
-
-def optimize(scheduler_name: t.Optional[str] = None) -> None:
-    # i suggest to test that the generated path is correct
-    path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/data/'
-    I_V_opt, I_V_final = get_instance_names(path, k =3)
-    I_V_opt_flat = [item for sublist in list(I_V_opt.values()) for item in sublist]
-    # test only size 20
-    #instance_list = I_V_opt[20]      
+def optimize(config_fname: t.Optional[str] = None) -> None:
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), config_fname)
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    instance_list = config["instance_list"]   
+    min_noise = config["min_noise"]
+    max_noise = config["max_noise"]
     search_space = {
-        "noise": tune.uniform(0.2, 2),
-        "instance": tune.grid_search(I_V_opt_flat),
-        #"instance": tune.grid_search(instance_list),
+        "noise": tune.uniform(min_noise, max_noise),
+        "instance": tune.grid_search(instance_list),
     }
 
     # you can select how much of the gpu memory is used by any instance. This is a bit of a trial and error, start high and try to decrease it until it works basically
@@ -77,22 +36,21 @@ def optimize(scheduler_name: t.Optional[str] = None) -> None:
 
     # set experiment name
     run_config = RunConfig(
-        name = 'hpo_3sat_uniform_noise',
+        name = config["experiment_name"],
         local_dir=local_file_uri_to_path(mlflow.active_run().info.artifact_uri),
         log_to_file=True,
     )
-
     tuner = tune.Tuner(
-        # set params and number of samples
+        
         tune.with_parameters(
             objective_fn,
-            params={'max_flips': 100000, 'max_runs': 1000, 'batch_size': 1, 'task': 'hpo'}
+            params=config
         ),
         # Tuning configuration.
         tune_config=tune.TuneConfig(
-            metric="tts",
+            metric="its",
             mode="min",
-            num_samples=50,
+            num_samples=1,
         ),
         # Hyperparameter search space.
         param_space=search_space,
@@ -102,10 +60,21 @@ def optimize(scheduler_name: t.Optional[str] = None) -> None:
     _ = tuner.fit()
 
 
-if __name__ == "__main__":
-    # set folder where to save results
-    tracking_uri = os.path.join(os.path.expanduser('~/'), 'projects/camsat/camsat_v2/data/experiments/tcas/')
-    print(tracking_uri) 
-    mlflow.set_tracking_uri(tracking_uri)
+def main(tracking_uri, config_fname):
+    tracking_uri_exapanded = os.path.join(os.path.expanduser('~/'), tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri_exapanded)
     with mlflow.start_run():
-        optimize()
+        optimize(config_fname)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--tracking_uri', type=str, default='experiments/defaults/',
+                        help='The tracking URI to use for the experiments, defaults to experiments/defaults/ if not provided.')
+    
+    parser.add_argument('--config_fname', type=str, default='debug.json',
+                    help='The name of the configuration file stored in the config folder, defaults to debug.json if not provided.')
+
+
+    args = parser.parse_args()
+
+    main(args.tracking_uri)

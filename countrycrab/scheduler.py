@@ -13,8 +13,9 @@ from solver import camsat
 import json
 
 
-def schedule(scheduler_name: t.Optional[str] = None) -> None:     
-    with open('config.json', 'r') as f:
+def schedule(config_fname: t.Optional[str] = None) -> None:   
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), config_fname)
+    with open(config_path, 'r') as f:  
         config = json.load(f)
     instance_list = config["instance_list"]
 
@@ -51,8 +52,21 @@ def schedule(scheduler_name: t.Optional[str] = None) -> None:
     _ = tuner.fit()
 
 
-if __name__ == "__main__":
-    tracking_uri = os.path.join(os.path.expanduser('~/'), 'projects/camsat/camsat_v2/data/experiments/tcas/')
-    mlflow.set_tracking_uri(tracking_uri)
+def main(tracking_uri, config_fname):
+    tracking_uri_exapanded = os.path.join(os.path.expanduser('~/'), tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri_exapanded)
     with mlflow.start_run():
-        schedule()
+        schedule(config_fname)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--tracking_uri', type=str, default='experiments/defaults/',
+                        help='The tracking URI to use for the experiments, defaults to experiments/defaults/ if not provided.')
+    
+    parser.add_argument('--config_fname', type=str, default='debug.json',
+                    help='The name of the configuration file stored in the config folder, defaults to debug.json if not provided.')
+
+
+    args = parser.parse_args()
+
+    main(args.tracking_uri)
