@@ -4,8 +4,8 @@ import os
 import typing as t
 import math
 
-from compiler import map_camsat
-from analyze import vector_its
+from countrycrab.compiler import map_camsat
+from countrycrab.analyze import vector_its
 
 import campie
 import cupy as cp
