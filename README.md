@@ -16,3 +16,10 @@ cd docker
 ```
 
 The terminal output will then instruct you how to connect to the running instance.
+
+### Installing CountryCrab
+
+After running Docker to install the CountryCrab package run
+```sh
+pip install -e .
+```

@@ -1,0 +1,23 @@
+{
+    "max_runs": 10000,
+    "max_flips": 1000,
+    "noise_distribution": "normal",
+    "min_noise": 0.5,
+    "max_noise": 1,
+    "num_samples": 5,
+    "p_solve": 0.99,
+    "task": "hpo",
+    "experiment_name": "hpo_example",
+    "instance_list": [
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-01.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-02.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-03.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-04.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-05.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-06.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-07.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-08.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-09.cnf",
+        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-010.cnf"
+    ]
+}

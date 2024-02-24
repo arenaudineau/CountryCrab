@@ -11,7 +11,7 @@ import campie
 import cupy as cp
 
 
-def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -36,7 +36,7 @@ def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     # get parameters. This should be "fixed values"
     # max runs is the number of parallel initialization (different inputs)
-    max_runs = params.get("max_runs", 1000)
+    max_runs = params.get("max_runs", 100)
     # max_flips is the maximum number of iterations
     max_flips = params.get("max_flips", 1000)
     # scheduling is the way the cores are used
@@ -206,6 +206,6 @@ def camsat(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             return {"its": np.nan}
     elif task == "debug":
         inputs = cp.asnumpy(inputs)
-        return p_vs_t, violated_constr_mat, inputs
+        return p_vs_t, cp.asnumpy(violated_constr_mat), cp.asnumpy(inputs)
     else:
         raise ValueError(f"Unknown task: {task}")
