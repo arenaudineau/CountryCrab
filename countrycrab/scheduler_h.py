@@ -52,7 +52,6 @@ def schedule(scheduler_name: t.Optional[str] = None) -> None:
     )
     _ = tuner.fit()
 
-
 if __name__ == "__main__":
     tracking_uri = os.path.join(os.path.expanduser('~/'), 'projects/camsat/camsat_v2/data/experiments/hierarchical/')
     mlflow.set_tracking_uri(tracking_uri)
