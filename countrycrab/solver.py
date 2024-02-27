@@ -61,19 +61,24 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     # load the heuristic function from a separate file
     heuristic_name = config.get("heuristic", 'walksat_m')
-    
     heuristics_dict = {
         'walksat_m': walksat_m,
     }
-
     heuristic_function = heuristics_dict.get(heuristic_name)
-
     if heuristic_function is None:
         raise ValueError(f"Unknown heuristic: {heuristic_name}")
+
+    # check if compiler and heuristic are compatible
+    accepted_herusitics = {
+        'compile_walksat_m': 'walksat_m',
+    }
+    if heuristic_name != accepted_herusitics.get(compiler_name):
+        raise ValueError(f"Compiler {compiler_name} is not compatible with heuristic {heuristic_name}")
 
     # call the heuristic function with the necessary arguments
     violated_constr_mat, n_iters, inputs = heuristic_function(architecture, config,params)
 
+    # METRICS
     # target_probability
     p_solve = params.get("p_solve", 0.99)
     # task is the type of task to be performed
