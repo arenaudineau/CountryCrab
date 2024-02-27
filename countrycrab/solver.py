@@ -4,7 +4,7 @@ import os
 import typing as t
 import math
 
-from countrycrab.compiler import map_camsat
+from countrycrab.compiler import compile_walksat_m
 from countrycrab.analyze import vector_its
 from countrycrab.heuristics import walksat_m
 
@@ -23,27 +23,19 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
 
 
     # get configuration. This is part of the scheduler search space
-    instance_addr = config["instance"]
     # noise is the standard deviation of noise applied to the make_values
     noise = config.get("noise", 0.5)
 
     # load instance and map it to the CAMSAT arrays
-    tcam_array, ram_array = map_camsat(instance_addr)
-    clauses = tcam_array.shape[0]
-    variables = tcam_array.shape[1]
+    #tcam_array, ram_array = map_camsat(instance_addr)
+    #clauses = tcam_array.shape[0]
+    #variables = tcam_array.shape[1]
 
-    # number of clauses that can map to each core
-    n_words = params.get("n_words", clauses)
-    # total number of cores
-    n_cores = params.get("n_cores", 1)
-    
     # get parameters. This should be "fixed values"
     # max runs is the number of parallel initialization (different inputs)
     max_runs = params.get("max_runs", 100)
     # max_flips is the maximum number of iterations
     max_flips = params.get("max_flips", 1000)
-    # scheduling is the way the cores are used
-    scheduling = params.get("scheduling", "fill_first")
     # noise profile
     noise_dist = params.get("noise_distribution",'normal')
     # target_probability
@@ -51,13 +43,20 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # task is the type of task to be performed
     task = params.get("task", "debug")
 
+    compiler_name = config.get("compiler", 'compile_walksat_m')
+    
+    compilers_dict = {
+        'compile_walksat_m': compile_walksat_m,
+    }
 
+    compiler_function = compilers_dict.get(compiler_name)
+
+    tcam, ram, tcam_cores, ram_cores, n_cores = compiler_function(config, params)
+    variables = tcam.shape[1]
+    clauses = tcam.shape[0]
 
     # generate random inputs
     inputs = cp.random.randint(2, size=(max_runs, variables)).astype(cp.float32)
-
-    tcam = cp.asarray(tcam_array, dtype=cp.float32)
-    ram = cp.asarray(ram_array, dtype=cp.float32)
     
     # hyperparemeters can be provided by the user
     if "hp_location" in params:
@@ -68,58 +67,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         max_flips = int(filtered_df["max_flips_max"].values[0])
 
 
-
-    if scheduling == "fill_first":
-        needed_cores = math.ceil(tcam.shape[0] / n_words)
-        if n_cores < needed_cores:
-            raise ValueError(
-                f"Not enough CAMSAT cores available for mapping the instance: clauses={clauses}, n_cores={n_cores}, n_words={n_words}, needed_cores={needed_cores}"
-            )
-
-        # potentially reduce the amount of cores used to the actually needed amount
-        n_cores = needed_cores
-
-        # extend tcam and ram so they can be divided by n_cores
-        if clauses % n_cores != 0:
-            padding = n_cores * n_words - tcam.shape[0]
-            tcam = cp.concatenate(
-                (tcam, cp.full((padding, variables), cp.nan)), dtype=cp.float32
-            )
-            ram = cp.concatenate(
-                (ram, cp.full((padding, variables), 0)), dtype=cp.float32
-            )
-
-    elif scheduling == "round_robin":
-        core_size = math.ceil(tcam.shape[0] / n_cores)
-
-        # create potentialy uneven splits, that's why we need a python list
-        tcam_list = cp.array_split(tcam, n_cores)
-        ram_list = cp.array_split(ram, n_cores)
-
-        # even out the sizes of each core via padding
-        for i in range(len(tcam_list)):
-            if tcam_list[i].shape[0] == core_size:
-                continue
-
-            padding = core_size - tcam_list[i].shape[0]
-            tcam_list[i] = cp.concatenate(
-                (tcam_list[i], cp.full((padding, variables), cp.nan)), dtype=cp.float32
-            )
-            ram_list[i] = cp.concatenate(
-                (ram_list[i], cp.full((padding, variables), 0)), dtype=cp.float32
-            )
-
-        # finally, update the tcam and ram, with the interspersed padding now added
-        tcam = cp.concatenate(tcam_list)
-        ram = cp.concatenate(ram_list)
-
-    else:
-        raise ValueError(f"Unknown scheduling algorithm: {scheduling}")
-
-    # split into cores
-    tcam_cores = tcam.reshape((n_cores, -1, variables))
-    ram_cores = ram.reshape((n_cores, -1, variables))
-
+    
     # note, to speed up the code violated_constr_mat does not represent the violated constraints but the unsatisfied variables. It doesn't matter for the overall computation of p_vs_t
     violated_constr_mat = cp.full((max_runs, max_flips), cp.nan, dtype=cp.float32)
     
@@ -140,6 +88,8 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         "inputs": inputs,
         "tcam": tcam,
         "ram": ram,
+        "tcam_cores": tcam_cores,
+        "ram_cores": ram_cores,
         "violated_constr_mat": violated_constr_mat,
         "max_flips": max_flips,
         "n_cores": n_cores,
