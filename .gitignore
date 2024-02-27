@@ -4,3 +4,4 @@ venv
 *.csv
 *.cnf
 __pycache__
+tests/tb*.ipynb
