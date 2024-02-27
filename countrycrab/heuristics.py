@@ -24,20 +24,37 @@ import campie
 import cupy as cp
 
 
-def walksat_m(data):
-    inputs = data.get('inputs')   
-    tcam = data.get('tcam')
-    ram = data.get('ram')
-    tcam_cores = data.get('tcam_cores')
-    ram_cores = data.get('ram_cores')
-    violated_constr_mat = data.get('violated_constr_mat')
-    n_cores = data.get('n_cores')
+def walksat_m(architecture, config, params):
 
-    max_flips = data.get('max_flips')
-    noise_dist = data.get('noise_dist')
-    noise = data.get('noise')
+    tcam = architecture[0]
+    ram = architecture[1]
+    tcam_cores = architecture[2]
+    ram_cores = architecture[3]
+
+    # get parameters. This should be "fixed values"
+    # max runs is the number of parallel initialization (different inputs)
+    max_runs = params.get("max_runs", 100)
+    # max_flips is the maximum number of iterations
+    max_flips = params.get("max_flips", 1000)
+    # noise profile
+    noise_dist = params.get("noise_distribution",'normal')
+    # number of cores
+    n_cores = params.get("n_cores", 1)
+    # variables
+    variables = tcam.shape[1]
+
+
+    # get configuration. This is part of the scheduler search space
+    # noise is the standard deviation of noise applied to the make_values
+    noise = config.get('noise',0.8)
+
     
-# tracks the amount of iteratiosn that are actually completed
+    # note, to speed up the code violated_constr_mat does not represent the violated constraints but the unsatisfied variables. It doesn't matter for the overall computation of p_vs_t
+    violated_constr_mat = cp.full((max_runs, max_flips), cp.nan, dtype=cp.float32)
+
+    # generate random inputs
+    inputs = cp.random.randint(2, size=(max_runs, variables)).astype(cp.float32)
+    # tracks the amount of iteratiosn that are actually completed
     n_iters = 0
 
     for it in range(max_flips - 1):
@@ -96,4 +113,4 @@ def walksat_m(data):
         # update inputs
         campie.flip_indices(inputs, update[:, cp.newaxis])
 
-    return violated_constr_mat, n_iters
+    return violated_constr_mat, n_iters, inputs

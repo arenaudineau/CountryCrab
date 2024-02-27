@@ -25,8 +25,6 @@ import cupy as cp
 
 def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     instance_name = config["instance"]
-    scheduling = params.get("scheduling", "fill_first")
-
 
     # simple mapping, takes the instance and map it to a 'large' tcam and ram
     # load instance
@@ -57,6 +55,7 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     # number of clauses that can map to each core
     n_words = params.get("n_words", clauses)
     n_cores = params.get("n_cores", 1)
+    scheduling = params.get("scheduling", "fill_first")
 
     if scheduling == "fill_first":
         needed_cores = math.ceil(tcam.shape[0] / n_words)
@@ -109,5 +108,10 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     tcam_cores = tcam.reshape((n_cores, -1, variables))
     ram_cores = ram.reshape((n_cores, -1, variables))
 
+    # rewrite the parameters
+    params['n_cores'] = n_cores
+    params['variables'] = variables
+    params['clauses'] = clauses
+    
     architecture = [tcam, ram, tcam_cores, ram_cores, n_cores]
-    return tcam, ram, tcam_cores, ram_cores, n_cores
+    return architecture, params
