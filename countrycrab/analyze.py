@@ -30,7 +30,7 @@ def vector_its(iteration, probability, p_target = 0.99):
         its[np.where(probability == 1)[0]] = np.where(probability >=p_target)[0][0]*np.ones(len(np.where(probability == 1)[0]))
     return its
 
-def generate_report_hpo(tracking_uri,experiment_name):
+def generate_report(tracking_uri,experiment_name):
     mlflow.set_tracking_uri(tracking_uri)
     all_experiments = [exp.experiment_id for exp in mlflow.search_experiments()]
     runs = mlflow.search_runs(experiment_ids=all_experiments, run_view_type=ViewType.ALL)
