@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import os
 import typing as t
+import json
 
 
 from countrycrab.compiler import compile_walksat_m
@@ -51,12 +52,16 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     # hyperparemeters can be provided by the user
     if "hp_location" in params:
-        optimized_hp = pd.read_csv(params["hp_location"])
-        # take the correct hp for the size of the problem
-        filtered_df = optimized_hp[(optimized_hp["N_V"] == params['variables'])]            
-        config['noise'] = filtered_df["noise"].values[0]
-        max_flips = int(filtered_df["max_flips_max"].values[0])
-
+        with open(params["hp_location"], 'r') as f:  
+            optimized_hp = json.load(f)
+        if params['variables'] in optimized_hp['N_V']:
+            # Get the index of N in 'N_V'
+            index = optimized_hp['N_V'].index(params['variables'])
+            # Retrieve the corresponding noise
+            config['noise'] = optimized_hp['noise'][index]
+            params['max_flips'] = optimized_hp['max_flips_median'][index]
+        else:
+            raise ValueError(f"Number of variables {params['variables']} not found in the hyperparameters file {params['hp_location']}")        
 
     
     # load the heuristic function from a separate file
@@ -78,13 +83,15 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # call the heuristic function with the necessary arguments
     violated_constr_mat, n_iters, inputs = heuristic_function(architecture, config,params)
 
-    # METRICS
+    # METRIC FUNCTIONS
     # target_probability
     p_solve = params.get("p_solve", 0.99)
     # task is the type of task to be performed
     task = params.get("task", "debug")
     # max runs is the number of parallel initialization (different inputs)
     max_runs = params.get("max_runs", 100)
+    # max_flips is the maximum number of iterations
+    max_flips = params.get("max_flips", 1000)
 
     # probability os solving the problem as a function of the iterations
     p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
