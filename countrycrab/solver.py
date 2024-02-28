@@ -59,7 +59,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             index = optimized_hp['N_V'].index(params['variables'])
             # Retrieve the corresponding noise
             config['noise'] = optimized_hp['noise'][index]
-            params['max_flips'] = optimized_hp['max_flips_median'][index]
+            params['max_flips'] = int(optimized_hp['max_flips_median'][index])
         else:
             raise ValueError(f"Number of variables {params['variables']} not found in the hyperparameters file {params['hp_location']}")        
 
@@ -100,7 +100,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     solved = (np.sum(p_vs_t) > 0)
 
     # Compute iterations to solution for 99% of probability to solve the problem
-    iteration_vector = np.arange(1, n_iters + 1)
+    iteration_vector = np.arange(1, n_iters)
     its = vector_its(iteration_vector, p_vs_t, p_target=p_solve)
 
     if task == 'hpo':
@@ -115,7 +115,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     elif task == 'solve':
         if solved:
             # return the its at the given max_flips
-            return {"its": its[max_flips]}
+            return {"its": its[-1]}
         else:
             return {"its": np.nan}
     elif task == "debug":

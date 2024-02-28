@@ -8,8 +8,8 @@ from mlflow.utils.file_utils import local_file_uri_to_path
 from mlflow import MlflowClient
 from ray import tune
 from ray.air import RunConfig
-from compiler import get_instance_names
-from solver import camsat
+from solver import solve
+import argparse
 import json
 
 
@@ -24,8 +24,9 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
         "instance": tune.grid_search(instance_list),
     }
 
+    # set resource per trial based on experiments. A high value is used to ensure that the experiment runs but it can be decreased to optimize the use of the GPU
     resources_per_trial = {'gpu':0.2}
-    objective_fn = tune.with_resources(camsat, resources_per_trial)
+    objective_fn = tune.with_resources(solve, resources_per_trial)
     # Need this to log RayTune artifacts into MLflow runs' artifact store.
     run_config = RunConfig(
         name = config["experiment_name"],
@@ -52,21 +53,24 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
     _ = tuner.fit()
 
 
-def main(tracking_uri, config_fname):
-    tracking_uri_exapanded = os.path.join(os.path.expanduser('~/'), tracking_uri)
+def main(tracking_uri, config):
+    module_path = os.path.abspath(os.path.join(""))
+    tracking_uri_exapanded = module_path+'/data/experiments/' + tracking_uri 
     mlflow.set_tracking_uri(tracking_uri_exapanded)
     with mlflow.start_run():
-        schedule(config_fname)
+        schedule(config)
+    print('Experiment completed')
+    print(tracking_uri_exapanded)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--tracking_uri', type=str, default='experiments/defaults/',
                         help='The tracking URI to use for the experiments, defaults to experiments/defaults/ if not provided.')
     
-    parser.add_argument('--config_fname', type=str, default='debug.json',
+    parser.add_argument('--config', type=str, default='debug.json',
                     help='The name of the configuration file stored in the config folder, defaults to debug.json if not provided.')
 
 
     args = parser.parse_args()
 
-    main(args.tracking_uri)
+    main(args.tracking_uri, args.config)

@@ -57,7 +57,7 @@ def walksat_m(architecture, config, params):
     # tracks the amount of iteratiosn that are actually completed
     n_iters = 0
 
-    for it in range(max_flips - 1):
+    for it in range(max_flips):
         n_iters += 1
 
         # global
