@@ -116,7 +116,7 @@ def walksat_m(architecture, config, params):
     return violated_constr_mat, n_iters, inputs
 
 
-def camsat_G(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -247,54 +247,7 @@ def camsat_G(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
     
-
-    p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
-    p_vs_t = cp.asnumpy(p_vs_t)
-    violated_constr_mat = cp.asnumpy(violated_constr_mat)
-
-    if task == "hpo":
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            best_tts = np.min(tts[tts > 0])
-            best_max_flips = np.where(tts == tts[tts > 0][np.argmin(tts[tts > 0])])
-            return {"tts": best_tts, "max_flips_opt": best_max_flips[0][0]}
-
-        else:
-            return {"tts": np.nan, "max_flips_opt": max_flips}
-
-    elif task == "debug":
-        inputs = cp.asnumpy(var_inputs)
-        return p_vs_t, violated_constr_mat, inputs
-
-    else:
-        if "pipeline" in params and params["pipeline"] == True:
-            p_vs_t = np.clip(p_vs_t * 3, 0, 1)
-
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            
-            p_target=0.99
-                    
-            if np.max(p_vs_t) == 1:
-                # check if 1 before the max_flips
-                idx = np.where(p_vs_t==1)[0][0]
-                if idx<max_flips_median:
-                    tts_median = np.where(p_vs_t>=p_target)[0][0]
-                else:
-                    tts_median = tts[max_flips_median]
-            else:
-                tts_median = tts[max_flips_median]
-                    
-            tts_max = tts[-2]
-
-            return {"tts_max": tts_max, "tts_median": tts_median, "p_max":np.max(p_vs_t)}
-
-        else:
-            return {"tts_max": np.nan, "tts_median": np.nan}
+    return violated_constr_mat, n_iters, var_inputs
 
 def camsat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
@@ -443,54 +396,7 @@ def camsat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
     
-
-    p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
-    p_vs_t = cp.asnumpy(p_vs_t)
-    violated_constr_mat = cp.asnumpy(violated_constr_mat)
-
-    if task == "hpo":
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            best_tts = np.min(tts[tts > 0])
-            best_max_flips = np.where(tts == tts[tts > 0][np.argmin(tts[tts > 0])])
-            return {"tts": best_tts, "max_flips_opt": best_max_flips[0][0]}
-
-        else:
-            return {"tts": np.nan, "max_flips_opt": max_flips}
-
-    elif task == "debug":
-        inputs = cp.asnumpy(var_inputs)
-        return p_vs_t, violated_constr_mat, inputs
-
-    else:
-        if "pipeline" in params and params["pipeline"] == True:
-            p_vs_t = np.clip(p_vs_t * 3, 0, 1)
-
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            
-            p_target=0.99
-                    
-            if np.max(p_vs_t) == 1:
-                # check if 1 before the max_flips
-                idx = np.where(p_vs_t==1)[0][0]
-                if idx<max_flips_median:
-                    tts_median = np.where(p_vs_t>=p_target)[0][0]
-                else:
-                    tts_median = tts[max_flips_median]
-            else:
-                tts_median = tts[max_flips_median]
-                    
-            tts_max = tts[-2]
-
-            return {"tts_max": tts_max, "tts_median": tts_median, "p_max":np.max(p_vs_t)}
-
-        else:
-            return {"tts_max": np.nan, "tts_median": np.nan}
+    return violated_constr_mat, n_iters, var_inputs
 
 def camsat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
@@ -646,55 +552,8 @@ def camsat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         # update inputs
         #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
-    
 
-    p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
-    p_vs_t = cp.asnumpy(p_vs_t)
-    violated_constr_mat = cp.asnumpy(violated_constr_mat)
-
-    if task == "hpo":
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            best_tts = np.min(tts[tts > 0])
-            best_max_flips = np.where(tts == tts[tts > 0][np.argmin(tts[tts > 0])])
-            return {"tts": best_tts, "max_flips_opt": best_max_flips[0][0]}
-
-        else:
-            return {"tts": np.nan, "max_flips_opt": max_flips}
-
-    elif task == "debug":
-        inputs = cp.asnumpy(var_inputs)
-        return p_vs_t, violated_constr_mat, inputs
-
-    else:
-        if "pipeline" in params and params["pipeline"] == True:
-            p_vs_t = np.clip(p_vs_t * 3, 0, 1)
-
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            
-            p_target=0.99
-                    
-            if np.max(p_vs_t) == 1:
-                # check if 1 before the max_flips
-                idx = np.where(p_vs_t==1)[0][0]
-                if idx<max_flips_median:
-                    tts_median = np.where(p_vs_t>=p_target)[0][0]
-                else:
-                    tts_median = tts[max_flips_median]
-            else:
-                tts_median = tts[max_flips_median]
-                    
-            tts_max = tts[-2]
-
-            return {"tts_max": tts_max, "tts_median": tts_median, "p_max":np.max(p_vs_t)}
-
-        else:
-            return {"tts_max": np.nan, "tts_median": np.nan}
+    return violated_constr_mat, n_iters, var_inputs
 
 def camsat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
@@ -859,54 +718,7 @@ def camsat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
     
-
-    p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
-    p_vs_t = cp.asnumpy(p_vs_t)
-    violated_constr_mat = cp.asnumpy(violated_constr_mat)
-
-    if task == "hpo":
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            best_tts = np.min(tts[tts > 0])
-            best_max_flips = np.where(tts == tts[tts > 0][np.argmin(tts[tts > 0])])
-            return {"tts": best_tts, "max_flips_opt": best_max_flips[0][0]}
-
-        else:
-            return {"tts": np.nan, "max_flips_opt": max_flips}
-
-    elif task == "debug":
-        inputs = cp.asnumpy(var_inputs)
-        return p_vs_t, violated_constr_mat, inputs
-
-    else:
-        if "pipeline" in params and params["pipeline"] == True:
-            p_vs_t = np.clip(p_vs_t * 3, 0, 1)
-
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            
-            p_target=0.99
-                    
-            if np.max(p_vs_t) == 1:
-                # check if 1 before the max_flips
-                idx = np.where(p_vs_t==1)[0][0]
-                if idx<max_flips_median:
-                    tts_median = np.where(p_vs_t>=p_target)[0][0]
-                else:
-                    tts_median = tts[max_flips_median]
-            else:
-                tts_median = tts[max_flips_median]
-                    
-            tts_max = tts[-2]
-
-            return {"tts_max": tts_max, "tts_median": tts_median, "p_max":np.max(p_vs_t)}
-
-        else:
-            return {"tts_max": np.nan, "tts_median": np.nan}
+    return violated_constr_mat, n_iters, var_inputs
 
 def camsat_B2seq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
@@ -1071,51 +883,4 @@ def camsat_B2seq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
     
-
-    p_vs_t = cp.sum(violated_constr_mat[:, 1 : n_iters + 1] == 0, axis=0) / max_runs
-    p_vs_t = cp.asnumpy(p_vs_t)
-    violated_constr_mat = cp.asnumpy(violated_constr_mat)
-
-    if task == "hpo":
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            best_tts = np.min(tts[tts > 0])
-            best_max_flips = np.where(tts == tts[tts > 0][np.argmin(tts[tts > 0])])
-            return {"tts": best_tts, "max_flips_opt": best_max_flips[0][0]}
-
-        else:
-            return {"tts": np.nan, "max_flips_opt": max_flips}
-
-    elif task == "debug":
-        inputs = cp.asnumpy(var_inputs)
-        return p_vs_t, violated_constr_mat, inputs
-
-    else:
-        if "pipeline" in params and params["pipeline"] == True:
-            p_vs_t = np.clip(p_vs_t * 3, 0, 1)
-
-        if np.sum(p_vs_t) > 0:
-            tts = vector_tts(
-                np.linspace(1, len(p_vs_t) + 1, len(p_vs_t)), p_vs_t, p_target=0.99
-            )
-            
-            p_target=0.99
-                    
-            if np.max(p_vs_t) == 1:
-                # check if 1 before the max_flips
-                idx = np.where(p_vs_t==1)[0][0]
-                if idx<max_flips_median:
-                    tts_median = np.where(p_vs_t>=p_target)[0][0]
-                else:
-                    tts_median = tts[max_flips_median]
-            else:
-                tts_median = tts[max_flips_median]
-                    
-            tts_max = tts[-2]
-
-            return {"tts_max": tts_max, "tts_median": tts_median, "p_max":np.max(p_vs_t)}
-
-        else:
-            return {"tts_max": np.nan, "tts_median": np.nan}
+    return violated_constr_mat, n_iters, var_inputs
