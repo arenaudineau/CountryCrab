@@ -115,3 +115,28 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     
     architecture = [tcam, ram, tcam_cores, ram_cores, n_cores]
     return architecture, params
+
+
+def map_camsat_g(instance_name):
+    # simple mapping, takes the instance and map it to a 'large' tcam and ram
+    # load instance
+    formula = CNF(from_file=instance_name)
+    # extract clauses
+    clauses = list(filter(None, formula.clauses))
+    #for clause in clauses:
+    #    solver.add_clause(clause)
+    clauses = np.array(list(filter(None, formula.clauses)))
+    # map clauses to TCAM
+    ramf_array = np.zeros([2*len(np.unique(np.abs(clauses))),clauses.shape[0]])
+    ramb_array = np.zeros([clauses.shape[0],2*len(np.unique(np.abs(clauses)))])
+    for i in range(clauses.shape[0]):
+        pos_literal_indices = np.where(clauses[i,]>0)[0]
+        neg_literal_indices = np.where(clauses[i,]<0)[0]
+        if len(pos_literal_indices)!=0:
+            ramf_array[2*(np.abs(clauses[i,pos_literal_indices])-1),i]=1
+            ramb_array[i,2*(np.abs(clauses[i,pos_literal_indices])-1)]=1
+        if len(neg_literal_indices)!=0:
+            ramf_array[2*(np.abs(clauses[i,neg_literal_indices])-1)+1,i]=1
+            ramb_array[i,2*(np.abs(clauses[i,neg_literal_indices])-1)+1]=1
+    
+    return ramf_array, ramb_array
