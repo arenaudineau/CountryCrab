@@ -118,7 +118,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     elif task == 'solve':
         if solved:
             # return the its at the given max_flips
-            return {"its": its[-1]}
+            return {"its": its[-2]}
         else:
             return {"its": np.nan}
     elif task == "debug":
