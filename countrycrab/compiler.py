@@ -22,19 +22,23 @@ import typing as t
 import math
 import cupy as cp
 
+def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        clauses = []
+        for line in lines:
+            if line.startswith('c') or line.startswith('p'):
+                continue
+            elif line.startswith('%'):
+                break
+            clause = [int(x) for x in line.strip().split() if x != '0']
+            clauses.append(clause)
+    return clauses
 
 def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    
     instance_name = config["instance"]
-
-    # simple mapping, takes the instance and map it to a 'large' tcam and ram
-    # load instance
-    formula = CNF(from_file=instance_name)
-    # extract clauses
-    solver = Minisat22()
-    clauses = list(filter(None, formula.clauses))
-    for clause in clauses:
-        solver.add_clause(clause)
-    clauses = list(filter(None, formula.clauses))
+    clauses = load_clauses_from_cnf(instance_name)
     # map clauses to TCAM
     tcam_array = np.zeros([len(clauses), len(np.unique(abs(np.array(clauses))))])    
     tcam_array[:] = np.nan
