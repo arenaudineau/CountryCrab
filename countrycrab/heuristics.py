@@ -249,7 +249,7 @@ def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     return violated_constr_mat, n_iters, var_inputs
 
-def camsat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def walksat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -398,7 +398,7 @@ def camsat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     return violated_constr_mat, n_iters, var_inputs
 
-def camsat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def walksat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -555,7 +555,7 @@ def camsat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
 
     return violated_constr_mat, n_iters, var_inputs
 
-def camsat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def walksat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -720,7 +720,7 @@ def camsat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     return violated_constr_mat, n_iters, var_inputs
 
-def camsat_B2seq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+def walksat_B2seq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
