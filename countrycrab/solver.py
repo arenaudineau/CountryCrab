@@ -21,9 +21,9 @@ import typing as t
 import json
 
 
-from countrycrab.compiler import compile_walksat_m
+from countrycrab.compiler import compile_walksat_m, compile_walksat_g
 from countrycrab.analyze import vector_its
-from countrycrab.heuristics import walksat_m
+from countrycrab.heuristics import walksat_m, walksat_g
 
 import cupy as cp
 
@@ -45,6 +45,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     compiler_name = config.get("compiler", 'compile_walksat_m')
     compilers_dict = {
         'compile_walksat_m': compile_walksat_m,
+        'compile_walksat_g': compile_walksat_g
     }
     compiler_function = compilers_dict.get(compiler_name)
     architecture, params = compiler_function(config, params)
@@ -68,6 +69,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     heuristic_name = config.get("heuristic", 'walksat_m')
     heuristics_dict = {
         'walksat_m': walksat_m,
+        'walksat_g': walksat_g
     }
     heuristic_function = heuristics_dict.get(heuristic_name)
     if heuristic_function is None:
@@ -76,6 +78,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # check if compiler and heuristic are compatible
     accepted_herusitics = {
         'compile_walksat_m': 'walksat_m',
+        'compile_walksat_g': 'walksat_g',
     }
     if heuristic_name != accepted_herusitics.get(compiler_name):
         raise ValueError(f"Compiler {compiler_name} is not compatible with heuristic {heuristic_name}")
@@ -100,7 +103,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     solved = (np.sum(p_vs_t) > 0)
 
     # Compute iterations to solution for 99% of probability to solve the problem
-    iteration_vector = np.arange(1, n_iters)
+    iteration_vector = np.arange(1, len(p_vs_t)+1)
     its = vector_its(iteration_vector, p_vs_t, p_target=p_solve)
 
     if task == 'hpo':

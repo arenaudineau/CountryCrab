@@ -121,7 +121,7 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     return architecture, params
 
 
-def compile_camsat_g(instance_name):
+def compile_walksat_g(instance_name):
     # simple mapping, takes the instance and map it to a 'large' tcam and ram
     # load instance
     formula = CNF(from_file=instance_name)
