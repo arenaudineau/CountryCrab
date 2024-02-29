@@ -7,17 +7,17 @@
     "num_samples": 5,
     "p_solve": 0.99,
     "task": "hpo",
-    "experiment_name": "hpo_example",
+    "experiment_name": "scheduler_example_hpo",
     "instance_list": [
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-01.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-02.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-03.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-04.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-05.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-06.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-07.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-08.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-09.cnf",
-        "/home/pedretti/projects/CountryCrab/data/uf20-91/uf20-010.cnf"
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-01.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-02.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-03.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-04.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-05.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-06.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-07.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-08.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-09.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-010.cnf"
     ]
 }

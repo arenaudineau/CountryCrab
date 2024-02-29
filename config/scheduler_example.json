@@ -1,0 +1,20 @@
+{
+    "max_runs": 10000,
+    "noise_distribution": "normal",
+    "hp_location": "/home/pedretti/projects/CountryCrab/data/hp/scheduler_example_hpo.json",
+    "p_solve": 0.99,
+    "task": "solve",
+    "experiment_name": "scheduler_example_run",
+    "instance_list": [
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-021.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-022.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-023.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-024.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-025.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-026.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-027.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-028.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-029.cnf",
+        "/home/pedretti/projects/CountryCrab/data/datasets/uf20-91/uf20-030.cnf"
+    ]
+}

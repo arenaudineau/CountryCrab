@@ -23,9 +23,13 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
         min_noise = config["min_noise"]
         max_noise = config["max_noise"]
         num_samples = config['num_samples']
-    else:
+    elif 'noise' in config:
         min_noise = config['noise']
         max_noise = config['noise']
+        num_samples = 1
+    else:
+        min_noise = 0.8
+        max_noise = 0.8
         num_samples = 1
 
     # load parameters to save them in the configuration    
