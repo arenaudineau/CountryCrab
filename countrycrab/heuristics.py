@@ -22,6 +22,7 @@ import math
 
 import campie
 import cupy as cp
+import warnings
 
 
 def walksat_m(architecture, config, params):
@@ -217,6 +218,7 @@ def walksat_g(architecture, config, params):
     return violated_constr_mat, n_iters, var_inputs
 
 def walksat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    warnings.warn("Untested heuristic with the broader environment. Please use walksat_m or walksat_g instead. ", UserWarning, stacklevel=2)
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -366,6 +368,7 @@ def walksat_SKC(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     return violated_constr_mat, n_iters, var_inputs
 
 def walksat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    warnings.warn("Untested heuristic with the broader environment. Please use walksat_m or walksat_g instead. ", UserWarning, stacklevel=2)
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -523,6 +526,7 @@ def walksat_Gseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     return violated_constr_mat, n_iters, var_inputs
 
 def walksat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    warnings.warn("Untested heuristic with the broader environment. Please use walksat_m or walksat_g instead. ", UserWarning, stacklevel=2)
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
@@ -688,6 +692,7 @@ def walksat_SKCseq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     return violated_constr_mat, n_iters, var_inputs
 
 def walksat_B2seq(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    warnings.warn("Untested heuristic with the broader environment. Please use walksat_m or walksat_g instead. ", UserWarning, stacklevel=2)
     # config contains parameters to optimize, params are fixed
 
     # Check GPUs are available.
