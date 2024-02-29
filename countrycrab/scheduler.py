@@ -47,9 +47,9 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
     heuristic_name = config.get("heuristic", 'walksat_m')
     compiler_name = config.get("compiler", 'compile_walksat_m')
 
-    # the only search space parameters are the instances in the case of the scheduler
+    # the only search space parameters are the instances and the noise
     search_space = {
-        "noise": tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist()),
+        "noise": tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist()), # note that uniform sampling may work better for some experiments
         "instance": tune.grid_search(instance_list),
         "p_solve": p_solve,
         "task": task,

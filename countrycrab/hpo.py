@@ -15,9 +15,12 @@ from enum import Enum
 import json
 import argparse
 import os
+import warnings
 
 
 def optimize(config: t.Optional[str] = None) -> None:
+    warnings.warn("This function is deprecated and will be removed in a future version. "
+                  "Use 'countrycrab.scheduler' instead.", UserWarning, stacklevel=2)
     module_path = os.path.abspath(os.path.join(""))
     config_path = module_path+'/config/'+config
     with open(config_path, 'r') as f:

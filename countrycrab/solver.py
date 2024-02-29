@@ -111,9 +111,9 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             # return the best (minimum) its and the corresponding max_flips
             best_its = np.min(its[its > 0])
             best_max_flips = np.where(its == its[its > 0][np.argmin(its[its > 0])])
-            return {"its_opt": best_its, "max_flips_opt": best_max_flips[0][0]}
+            return {"its": best_its, "max_flips_opt": best_max_flips[0][0]}
         else:
-            return {"its_opt": np.nan, "max_flips_opt": max_flips}
+            return {"its": np.nan, "max_flips_opt": max_flips}
     
     elif task == 'solve':
         if solved:
