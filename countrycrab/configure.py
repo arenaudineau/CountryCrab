@@ -20,27 +20,42 @@ import re
 def natural_keys(text):
     return [int(c) if c.isdigit() else c.lower() for c in re.split('(\d+)', text)]
 
-def split_hpo_test(instances_path, hpo_test = 0.2):
+def split_hpo_test(instances_path_list, hpo_test = 0.2, max_instances = 100):
     # this function load the isntances in the instances_path
     # split them in two dictionaries, one for hyperparameters optimization and one for testing
 
-    # Load instances
-    all_files = sorted(os.listdir(instances_path))
-    
-    
-    # Filter out files with a .cnf extension 
-    cnf_files = [file for file in all_files if file.endswith('.cnf')]
+    instances_hpo_list = []
+    instances_test_list = []
+    for instances_path in instances_path_list:
+        if not os.path.exists(instances_path):
+            raise FileNotFoundError(f"{instances_path} does not exist.")
+        
+        # Load instances
+        all_files = sorted(os.listdir(instances_path))
+        
+        
+        # Filter out files with a .cnf extension 
+        cnf_files = [file for file in all_files if file.endswith('.cnf')]
 
-    # sort them alphabetically
-    cnf_files.sort(key=natural_keys)
+        # sort them alphabetically
+        cnf_files.sort(key=natural_keys)
+        
+        # limit to max_instances
+        cnf_files = cnf_files[:max_instances]
+
+        # Use hpo_test of them for hpo
+        number_of_hpo_instances = int(len(cnf_files) * hpo_test)
+        
+        # Get the first 20% of the files
+        instances_hpo = cnf_files[:number_of_hpo_instances]
+        instances_hpo = [instances_path + filename for filename in instances_hpo]
+        instances_test = cnf_files[number_of_hpo_instances:]
+        instances_test = [instances_path + filename for filename in instances_test]
+
+        instances_hpo_list.append(instances_hpo)
+        instances_test_list.append(instances_test)
     
-    # Use hpo_test of them for hpo
-    number_of_hpo_instances = int(len(cnf_files) * hpo_test)
-    
-    # Get the first 20% of the files
-    instances_hpo = cnf_files[:number_of_hpo_instances]
-    instances_hpo = [instances_path + filename for filename in instances_hpo]
-    test_instances = cnf_files[number_of_hpo_instances:]
-    test_instances = [instances_path + filename for filename in test_instances]
-    
-    return instances_hpo, test_instances
+    instances_hpo_list = [item for sublist in instances_hpo_list for item in sublist]
+    instances_test_list = [item for sublist in instances_test_list for item in sublist]
+
+    return instances_hpo_list, instances_test_list
