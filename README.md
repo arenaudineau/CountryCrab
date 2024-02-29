@@ -21,6 +21,10 @@ cd docker
 
 The terminal output will then instruct you how to connect to the running instance.
 
+After connecting to the Jupyter Lab instance for a better shell UX (full shell prompt and other interactive features) run
+```sh
+exec bash
+```
 ## Installing CountryCrab
 
 After running Docker to install the CountryCrab package run
