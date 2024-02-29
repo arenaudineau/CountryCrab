@@ -121,7 +121,7 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     return architecture, params
 
 
-def map_camsat_g(instance_name):
+def compile_camsat_g(instance_name):
     # simple mapping, takes the instance and map it to a 'large' tcam and ram
     # load instance
     formula = CNF(from_file=instance_name)
@@ -143,4 +143,5 @@ def map_camsat_g(instance_name):
             ramf_array[2*(np.abs(clauses[i,neg_literal_indices])-1)+1,i]=1
             ramb_array[i,2*(np.abs(clauses[i,neg_literal_indices])-1)+1]=1
     
-    return ramf_array, ramb_array
+    architecture = [ramf_array, ramb_array]
+    return architecture

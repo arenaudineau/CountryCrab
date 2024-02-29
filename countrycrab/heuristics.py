@@ -116,29 +116,35 @@ def walksat_m(architecture, config, params):
     return violated_constr_mat, n_iters, inputs
 
 
-def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
-    # config contains parameters to optimize, params are fixed
-
-    # Check GPUs are available.
-    if os.environ.get("CUDA_VISIBLE_DEVICES", None) is None:
-        raise RuntimeError(
-            f"No GPUs available. Please, set `CUDA_VISIBLE_DEVICES` environment variable."
-        )
-    #print('selected gpu')
-    #print(os.environ.get("CUDA_VISIBLE_DEVICES", None))
-    instance_addr = config["instance"]
-    #print('loaded instance')
-    ramf_array, ramb_array = map_camsat_g(instance_addr)
-    #print('arrays compiled')
-    max_runs = params.get("max_runs", 1000)
-
+def walksat_g(architecture, config, params):
+   
+    ramf_array = architecture[0]
+    ramb_array = architecture[1]
+    
+    # get parameters. This should be "fixed values"
+    # max runs is the number of parallel initialization (different inputs)
+    max_runs = params.get("max_runs", 100)
+    # max_flips is the maximum number of iterations
+    max_flips = params.get("max_flips", 1000)
+    # noise profile
+    # number of cores
+    n_cores = params.get("n_cores", 1)
+    # variables
     clauses = ramf_array.shape[1]
+    # clauses
     variables = int(ramf_array.shape[0]/2)
     literals = 2*variables
+
+    # get configuration. This is part of the scheduler search space
+    # noise is the standard deviation of noise applied to the make_values
+    noise = config.get('noise',0.8)
+
+
     var_inputs = cp.random.randint(2, size=(max_runs, variables)).astype(cp.float32)
     lit_inputs = cp.zeros((max_runs,literals)).astype(cp.float32)
-    pos_lit_indices = 2*cp.arange(0,variables,1)
-    neg_lit_indices = 2*cp.arange(0,variables,1)+1
+    # do you need the following two?
+    # pos_lit_indices = 2*cp.arange(0,variables,1)
+    # neg_lit_indices = 2*cp.arange(0,variables,1)+1
     lit_inputs[:,2*cp.arange(0,variables,1)]=var_inputs
     lit_inputs[:,2*cp.arange(0,variables,1)+1]=cp.abs(var_inputs-1)
 
@@ -146,30 +152,6 @@ def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     ramf = cp.asarray(ramf_array, dtype=cp.float32)
     ramb = cp.asarray(ramb_array, dtype=cp.float32)
     
-    n_variables = variables
-    n_words = clauses
-    n_cores = config.get("n_cores", 1)
-
-    task = params.get("task", "debug")
-
-    if task == "solve":
-        fname = params["hp_location"]
-        optimized_hp = pd.read_csv(fname)
-        if n_cores>1:
-            filtered_df = optimized_hp[
-                (optimized_hp["n_cores"] == n_cores)
-                & (optimized_hp["n_words"] == n_words)
-                & (optimized_hp["N_V"] == n_variables)
-            ]
-        else:
-            filtered_df = optimized_hp[(optimized_hp["N_V"] == n_variables)]            
-        noise = filtered_df["noise"].values[0]
-        max_flips = int(filtered_df["max_flips_max"].values[0])
-        max_flips_median = int(filtered_df["max_flips_median"].values[0])
-
-    else:
-        noise = config.get("noise", 2)
-        max_flips = params.get("max_flips", 1000)
 
     violated_constr_mat = cp.full((max_runs, max_flips), cp.nan, dtype=cp.float32)
 
@@ -186,13 +168,18 @@ def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         f_val = lit_inputs @ ramf
         s_val = cp.zeros((max_runs,clauses))
         z_val = cp.zeros((max_runs,clauses))
+
+        # s_val is the value of the unsatisfied clauses
         s_val[cp.where(f_val==0)] = 1
+        # z_val is the value of satified clauses with only one literal = true
         z_val[cp.where(f_val==1)] = 1
         a = s_val @ ramb
         b = z_val @ ramb
         lit_one_indices = cp.where(lit_inputs==1)
         lit_zero_indices = cp.where(lit_inputs==0)
-        neg_lit_indices = 2*cp.arange(0,variables,1)+1
+        # neg_lit_indices = 2*cp.arange(0,variables,1)+1 # do you need it?
+        
+        # compute the gain values
         mv_arr = cp.reshape(a[lit_zero_indices[0],lit_zero_indices[1]],(max_runs,variables))
         bv_arr = cp.reshape(b[lit_one_indices[0],lit_one_indices[1]],(max_runs,variables))
         g_arr = mv_arr - bv_arr
@@ -204,27 +191,10 @@ def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         if cp.sum(violated_constr_mat[:, it]) == 0:
             break 
 
-        #if n_cores == 1:
-            # there is no difference between the global matches and the core matches
-            # if there is only one core. we can just copy the global results and
-            # and wrap a single core dimension around them
-         #   matches, y, violated_constr = map(
-          #      lambda x: x[cp.newaxis, :],
-           #     [matches, y, violated_constr],
-            #)
-        #else:
-            # otherwise, actually compute the matches for each core
-         #   matches = campie.tcam_match(inputs, tcam_cores)
-          #  y = matches @ ram_cores
-           # violated_constr = cp.sum(y > 0, axis=2)
-
         # add noise
-        #print(mv_arr)
-        #print(y)
         y += noise * cp.random.randn(*y.shape, dtype=y.dtype)
-        #print(y)
         y[mv_arr < 1] = -100
-        #print(y)
+
         # select highest values
         y, violated_constr = map(
                 lambda x: x[cp.newaxis, :],
@@ -242,9 +212,6 @@ def walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             update = update.T
             random_indices = cp.random.randint(0, update.shape[1], size=update.shape[0])
             update = update[cp.arange(update.shape[0]), random_indices]
-        #print(update)
-        # update inputs
-        #campie.flip_indices(var_inputs, update[:, cp.newaxis])
         campie.flip_indices(var_inputs, update[:, cp.newaxis])
     
     return violated_constr_mat, n_iters, var_inputs
