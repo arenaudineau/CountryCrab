@@ -117,7 +117,7 @@ def walksat_m(architecture, config, params):
 
 
 def walksat_g(architecture, config, params):
-   
+    # print("Solving instance with walksat_g...")
     ramf_array = architecture[0]
     ramb_array = architecture[1]
     

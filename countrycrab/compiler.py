@@ -121,7 +121,9 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     return architecture, params
 
 
-def compile_walksat_g(instance_name):
+def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
+    instance_name = config["instance"]
+    # print("Compiling instance with walksat_g...")
     # simple mapping, takes the instance and map it to a 'large' tcam and ram
     # load instance
     formula = CNF(from_file=instance_name)
@@ -144,4 +146,4 @@ def compile_walksat_g(instance_name):
             ramb_array[i,2*(np.abs(clauses[i,neg_literal_indices])-1)+1]=1
     
     architecture = [ramf_array, ramb_array]
-    return architecture
+    return architecture, params
