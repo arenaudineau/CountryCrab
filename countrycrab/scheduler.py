@@ -45,9 +45,15 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
     heuristic_name = config.get("heuristic", 'walksat_m')
     compiler_name = config.get("compiler", 'compile_walksat_m')
 
+    if task == 'hpo':
+        # random sampling in case of hpo
+        noise_search_space = tune.uniform(min_noise, max_noise)
+    else:
+        # grid search in case of debugging or solving
+        noise_search_space = tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist())
     # the only search space parameters are the instances and the noise
     search_space = {
-        "noise": tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist()), # note that uniform sampling may work better for some experiments
+        "noise": noise_search_space,
         "instance": tune.grid_search(instance_list),
         "p_solve": p_solve,
         "task": task,
@@ -80,7 +86,7 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
         tune_config=tune.TuneConfig(
             metric="its",
             mode="min",
-            num_samples=1,
+            num_samples=num_samples,
         ),
         # Hyperparameter search space.
         param_space=search_space,
