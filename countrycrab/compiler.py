@@ -38,10 +38,10 @@ def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
 def count_variables(list_of_lists):
     # Flatten the list of lists
     flattened_list = [abs(item) for sublist in list_of_lists for item in sublist]
-    # Convert to a set to find unique integers
-    unique_integers = set(flattened_list)
-    # Return the number of unique integers
-    return len(unique_integers)
+    # Get largest integer in the list
+    largest_integer = max(flattened_list)
+    # Return the largest integer. This in the feature can be changed to the actual number of variables
+    return largest_integer
 
 def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
@@ -151,7 +151,7 @@ def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     variables = count_variables(clauses_list)
 
     # map clauses to TCAM
-    ramf_array = np.zeros([2*variables,clauses.shape[0]])
+    ramf_array = np.zeros([2*variables,clauses])
     ramb_array = np.zeros([clauses,2*variables])
     
     for i,clause in enumerate(clauses_list):
