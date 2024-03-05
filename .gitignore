@@ -5,3 +5,6 @@ venv
 *.cnf
 __pycache__
 tests/tb*.ipynb
+test/debug*.ipynb
+test/Untitled*.ipynb
+config
