@@ -13,3 +13,4 @@ tests/exp*
 tests/iedm*
 tests/quicc*
 config
+.Trash*
