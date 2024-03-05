@@ -35,15 +35,26 @@ def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
             clauses.append(clause)
     return clauses
 
+def count_variables(list_of_lists):
+    # Flatten the list of lists
+    flattened_list = [abs(item) for sublist in list_of_lists for item in sublist]
+    # Convert to a set to find unique integers
+    unique_integers = set(flattened_list)
+    # Return the number of unique integers
+    return len(unique_integers)
+
 def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     
     instance_name = config["instance"]
-    clauses = load_clauses_from_cnf(instance_name)
+    clauses_list = load_clauses_from_cnf(instance_name)
+    
+    clauses = len(clauses_list)
+    variables = count_variables(clauses_list)
     # map clauses to TCAM
-    tcam_array = np.zeros([len(clauses), len(np.unique(abs(np.array(clauses))))])    
+    tcam_array = np.zeros([clauses, variables])    
     tcam_array[:] = np.nan
-    for i in range(len(clauses)):
-        tcam_array[i,abs(np.array(clauses[i]))-1]=clauses[i]
+    for i in range(len(clauses_list)):
+        tcam_array[i,abs(np.array(clauses_list[i]))-1]=clauses_list[i]
     tcam_array[tcam_array>0] = 1
     tcam_array[tcam_array<0] = 0
     # map clauses to RAM
@@ -51,8 +62,6 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     ram_array[ram_array==0]=1
     ram_array[np.isnan(ram_array)]=0
 
-    clauses = tcam_array.shape[0]
-    variables = tcam_array.shape[1]
 
     tcam = cp.asarray(tcam_array, dtype=cp.float32)
     ram = cp.asarray(ram_array, dtype=cp.float32)
@@ -126,24 +135,32 @@ def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     # print("Compiling instance with walksat_g...")
     # simple mapping, takes the instance and map it to a 'large' tcam and ram
     # load instance
-    formula = CNF(from_file=instance_name)
+    #formula = CNF(from_file=instance_name)
     # extract clauses
-    clauses = list(filter(None, formula.clauses))
+    #clauses = list(filter(None, formula.clauses))
+
+    instance_name = config["instance"]
+    clauses_list = load_clauses_from_cnf(instance_name)
+    #print(clauses)
     #for clause in clauses:
     #    solver.add_clause(clause)
-    clauses = np.array(list(filter(None, formula.clauses)))
+    #clauses = np.array(list(filter(None, formula.clauses)))
+    #clauses = np.array(clauses)
+
+    clauses = len(clauses_list)
+    variables = count_variables(clauses_list)
+
     # map clauses to TCAM
-    ramf_array = np.zeros([2*len(np.unique(np.abs(clauses))),clauses.shape[0]])
-    ramb_array = np.zeros([clauses.shape[0],2*len(np.unique(np.abs(clauses)))])
-    for i in range(clauses.shape[0]):
-        pos_literal_indices = np.where(clauses[i,]>0)[0]
-        neg_literal_indices = np.where(clauses[i,]<0)[0]
-        if len(pos_literal_indices)!=0:
-            ramf_array[2*(np.abs(clauses[i,pos_literal_indices])-1),i]=1
-            ramb_array[i,2*(np.abs(clauses[i,pos_literal_indices])-1)]=1
-        if len(neg_literal_indices)!=0:
-            ramf_array[2*(np.abs(clauses[i,neg_literal_indices])-1)+1,i]=1
-            ramb_array[i,2*(np.abs(clauses[i,neg_literal_indices])-1)+1]=1
+    ramf_array = np.zeros([2*variables,clauses.shape[0]])
+    ramb_array = np.zeros([clauses,2*variables])
     
+    for i,clause in enumerate(clauses_list):
+        for literal in clause:
+            if literal>0:
+                ramf_array[2*(literal-1),i]=1
+                ramb_array[i,2*(literal-1)]=1
+            else:
+                ramf_array[2*(-literal-1)+1,i]=1
+                ramb_array[i,2*(-literal-1)+1]=1    
     architecture = [ramf_array, ramb_array]
     return architecture, params
