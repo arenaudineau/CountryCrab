@@ -1,6 +1,6 @@
 data
 analysis
-countrycrab.egg.info/
+countrycrab.egg-info/
 .ipynb_checkpoints
 venv
 *.csv
@@ -9,4 +9,7 @@ __pycache__
 tests/tb*.ipynb
 tests/debug*.ipynb
 tests/Untitled*.ipynb
+tests/exp*
+tests/iedm*
+tests/quicc*
 config
