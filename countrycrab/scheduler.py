@@ -31,6 +31,8 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
     p_solve = config.get("p_solve", 0.99)
     # task is the type of task to be performed
     task = config.get("task", "debug")
+    # metric
+    metric = config.get("metric", "frequentist")
     # max runs is the number of parallel initialization (different inputs)
     max_runs = config.get("max_runs", 100)
     # max_flips is the maximum number of iterations
@@ -47,7 +49,9 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
 
     if task == 'hpo':
         # random sampling in case of hpo
-        noise_search_space = tune.uniform(min_noise, max_noise)
+        # noise_search_space = tune.uniform(min_noise, max_noise)
+        # TODO: select the search space based on an hyperparameter optimization
+        noise_search_space = tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist())
     else:
         # grid search in case of debugging or solving
         noise_search_space = tune.grid_search(np.linspace(min_noise, max_noise, num_samples).tolist())
@@ -64,11 +68,13 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
         "noise_distribution": noise_dist,
         "n_cores": n_cores,
         "n_words": n_words,
-        "scheduling": scheduling
+        "scheduling": scheduling,
+        "metric": metric
     }
 
     # set resource per trial based on experiments. A high value is used to ensure that the experiment runs but it can be decreased to optimize the use of the GPU
-    resources_per_trial = {'gpu':0.2}
+    gpu_resources = config.get('gpu_resources', 0.2)
+    resources_per_trial = {'gpu':gpu_resources}
     objective_fn = tune.with_resources(solve, resources_per_trial)
     # Need this to log RayTune artifacts into MLflow runs' artifact store.
     run_config = RunConfig(
@@ -86,7 +92,7 @@ def schedule(config_fname: t.Optional[str] = None) -> None:
         tune_config=tune.TuneConfig(
             metric="its",
             mode="min",
-            num_samples=num_samples,
+            num_samples=1, # TODO this has to be fixed together with the distribution choice above
         ),
         # Hyperparameter search space.
         param_space=search_space,
