@@ -133,7 +133,7 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
 
 def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     instance_name = config["instance"]
-    vpr_netlist_loc = config["netlist_dir"]
+    vpr_netlist_loc = config.get("netlist_dir","~/CountryCrab/data/vpr_netlist/")
     clauses_list = load_clauses_from_cnf(instance_name)
 
     clauses = len(clauses_list)
