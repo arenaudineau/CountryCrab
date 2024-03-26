@@ -126,6 +126,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             return p_vs_t, cp.asnumpy(violated_constr_mat), cp.asnumpy(inputs)
         else:
             raise ValueError(f"Unknown task: {task}")
+    
     elif metric == "bayesian":
         try:
             from countrycrab.metrics import vector_its_bayesian
@@ -135,6 +136,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
             its = np.nan
             its_err = np.nan
         return {"its": its, "its_err": its_err}
+    
     elif metric == "diversity":
         # Here we want to study how many different solutions we get and what's the frequency and ITS of each one
         # We need to return a dictionary with the different frequency and ITS
@@ -143,23 +145,21 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         if solved:
             # Step 1: Find where violated_constr_mat is zero for each run
             solved_runs = cp.where(violated_constr_mat[:, 1:n_iters+1] == 0)
-            
-            # Step 2: Count the number of different solutions
-            unique_solutions = cp.unique(inputs[solved_runs], axis=0)
+            solved_runs = solved_runs[0].get()  # Explicit conversion to NumPy array
+            inputs = cp.asnumpy(inputs)
+            # Step 2: Count the number of different solutions. 
+            unique_solutions = np.unique(inputs[solved_runs], axis=0)
             num_solutions = len(unique_solutions)
         
             # Step 3: Compute the frequency of each solution
-            frequency = cp.zeros(num_solutions)
+            # Step 3: Compute the frequency of each solution
+            frequency = np.zeros(num_solutions)
             for i, solution in enumerate(unique_solutions):
-                frequency[i] = cp.sum(cp.all(inputs == solution, axis=1))
+                frequency[i] = np.sum(np.all(inputs == solution, axis=1))
             
             # Step 4: Compute the ITS as usual
             iteration_vector = np.arange(1, len(p_vs_t)+1)
             its = vector_its(iteration_vector, p_vs_t, p_target=p_solve)
-
-            # Step 5 convert to numpy frequency and unique_solutions]
-            frequency = cp.asnumpy(frequency)
-            unique_solutions = cp.asnumpy(unique_solutions)
 
         if task == 'hpo':
             if solved:
