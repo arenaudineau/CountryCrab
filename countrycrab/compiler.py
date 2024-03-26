@@ -21,6 +21,7 @@ from pysat.formula import CNF
 import typing as t
 import math
 import cupy as cp
+import os
 
 def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
     with open(file_path, 'r') as file:
@@ -132,23 +133,14 @@ def compile_walksat_m(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
 
 def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     instance_name = config["instance"]
-    # print("Compiling instance with walksat_g...")
-    # simple mapping, takes the instance and map it to a 'large' tcam and ram
-    # load instance
-    #formula = CNF(from_file=instance_name)
-    # extract clauses
-    #clauses = list(filter(None, formula.clauses))
-
-    instance_name = config["instance"]
+    vpr_netlist_loc = config.get("netlist_dir","~/CountryCrab/data/vpr_netlist/")
     clauses_list = load_clauses_from_cnf(instance_name)
-    #print(clauses)
-    #for clause in clauses:
-    #    solver.add_clause(clause)
-    #clauses = np.array(list(filter(None, formula.clauses)))
-    #clauses = np.array(clauses)
 
     clauses = len(clauses_list)
     variables = count_variables(clauses_list)
+
+    num_wta_inputs = config.get("num_wta_inputs",variables)
+    scheduling = params.get("scheduling", "fill_first")
 
     # map clauses to TCAM
     ramf_array = np.zeros([2*variables,clauses])
@@ -162,5 +154,477 @@ def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
             else:
                 ramf_array[2*(-literal-1)+1,i]=1
                 ramb_array[i,2*(-literal-1)+1]=1    
-    architecture = [ramf_array, ramb_array]
+    
+    params['variables'] = variables
+    params['clauses'] = clauses
+
+    if scheduling == "fill_first":
+        var_list = np.arange(variables)
+        num_superTiles = math.ceil(variables/num_wta_inputs)
+        superTile_varIndices = []
+        last_index = 0
+        for i in range(num_superTiles):
+            if variables%num_wta_inputs==0:
+                superTile_varIndices.append(list(var_list[last_index:last_index+num_wta_inputs]))
+                last_index = last_index+num_wta_inputs
+            else:
+                if i<num_superTiles-1:
+                    superTile_varIndices.append(list(var_list[last_index:last_index+num_wta_inputs]))
+                    last_index = last_index+num_wta_inputs
+                else:
+                    superTile_varIndices.append(list(var_list[last_index:]))
+                    last_var = var_list[variables-1]
+                    superTile_varIndices[i].extend([last_var]*(num_wta_inputs-int(variables%num_wta_inputs)))
+    elif scheduling == "vpr":
+        net_filename = vpr_netlist_loc+os.path.basename(instance_name).split(".cnf")[0]+'.net'
+        superTile_varIndices, num_superTiles = read_netlist(net_filename,variables,clauses,num_wta_inputs)
+        for i in range(num_superTiles):
+            if len(superTile_varIndices[i])<num_wta_inputs:
+                diff = num_wta_inputs - len(superTile_varIndices[i])
+                superTile_varIndices[i].extend([superTile_varIndices[i][-1]]*diff)
+                
+    architecture = [ramf_array, ramb_array, superTile_varIndices, num_superTiles]
     return architecture, params
+
+def read_netlist(net_filename,nvar,nclause,num_wta_inputs):
+    variables = nvar
+    file = open(net_filename, 'r')
+    lines = file.readlines()
+     
+    count = 0
+    vpr_tile_inputs = []
+    vpr_tile_outputs = []
+    for i,line in enumerate(lines):
+        if 'clb[' in line:
+            tile_inputs = lines[i+2]
+            tile_inputs = [int(j) for j in tile_inputs.split('>')[1].split('<')[0].replace("open","").replace("_x","").split()]
+            tile_outputs_temp = lines[i+5]
+            tile_outputs_temp = tile_outputs_temp.split('>')[1].split('<')[0].replace("open","").replace(" ","").split('-&gt;clbouts1')
+            num_outputs = sum([1 for _ in tile_outputs_temp])-1
+            curr_index = i+10
+            output_lines_read = 0
+            tile_outputs = []
+            while output_lines_read < num_outputs:
+                if "mode=\"default\"" in lines[curr_index] and "instance=\"ble[" in lines[curr_index]:
+                    tile_outputs.append(int(lines[curr_index].split()[1].split("\"")[1].split("_l")[1]))
+                    output_lines_read = output_lines_read + 1
+               
+                curr_index = curr_index + 1
+               
+            vpr_tile_inputs.append(tile_inputs)
+            vpr_tile_outputs.append(tile_outputs)
+           
+    
+    num_clbs = len(vpr_tile_outputs)
+    vpr_var_list = []
+    for i in range(num_clbs):
+        output_temp = np.array(vpr_tile_outputs[i])
+        vpr_var_list.append(list(output_temp[np.where(output_temp<nvar+1)[0]]-1))
+    
+    counter = 0
+    for i in range(num_clbs):
+        counter = counter + len(vpr_var_list[i])
+    
+    if counter!=nvar:
+        print("Variables Missing in Post-Packing Netlist!!!")
+       
+    num_superTiles = math.ceil(variables/num_wta_inputs)
+    superTile_varIndices = []
+    vpr_var_list_copy = vpr_var_list.copy()
+    for i in range(num_superTiles):
+        pointer = 0
+        superTile_varIndices.append(vpr_var_list_copy[pointer])
+        vpr_var_list_copy.remove(vpr_var_list_copy[pointer])
+        curr_len = len(superTile_varIndices[i])
+        if curr_len < num_wta_inputs:
+            done_flag = 0
+            pointer = 0
+            while done_flag==0 and len(vpr_var_list_copy)!=0:
+                if curr_len +len(vpr_var_list_copy[pointer]) <= num_wta_inputs:
+                    superTile_varIndices[i].extend(vpr_var_list_copy[pointer])
+                    vpr_var_list_copy.remove(vpr_var_list_copy[pointer])
+                    curr_len = len(superTile_varIndices[i])
+                    if len(vpr_var_list_copy)==0:
+                        break
+                    if pointer>=len(vpr_var_list_copy)-1 or len(vpr_var_list_copy)==0 or curr_len==num_wta_inputs:
+                        done_flag = 1
+                else:
+                    pointer = pointer + 1
+                    if pointer==len(vpr_var_list_copy) or curr_len==num_wta_inputs:
+                        done_flag = 1
+                   
+                       
+        if len(vpr_var_list_copy)==0:
+            break
+    
+    return superTile_varIndices, num_superTiles
+
+
+# QUBO mappings available
+
+# Returns W, B, C of the QUBO energy from 3-SAT cnf (k = 3 SAT only so far)
+# W is returned as a symmetric matrix, i.e. E = x^T*W*x/2 + Bx + C
+    
+# mapping type 1: "clause_wise" mapping introduces an auxiliary variable for each clause of the cnf (Total QUBO size N = N_var + N_clauses)
+# mapping type 2: "shared" mapping introduces each auxiliary varibale for multiple clauses by solving an optimization 
+#     problem of finding x_ix_j = y substitutions minimizing the total number of aux variables (Total QUBO size N < N_var + N_clauses)
+#
+# mapping name 1: "Rosenberg" penalty (observed to be better for parallel updates on uf 3-SAT)
+# mapping name 2: "KZFD" penalty      (observed to be better for single updates on uf 3-SAT)
+
+def qubo_3sat_map(config: t.Dict) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    
+    instance_name = config["instance"]
+    clauses = load_clauses_from_cnf(instance_name)
+    for c in clauses:
+        if len(c) != 3:
+            raise RuntimeError("3 sat only!")
+
+    mapping_type = config["mapping_type"]   #clause_wise or shared   
+    if not (mapping_type in ["clause_wise", "shared"]):
+        raise RuntimeError("wrong mapping type!")
+    
+    mapping_name = config["mapping_name"]   #Rosenberg or KZFD    
+    if not (mapping_name in ["Rosenberg", "KZFD"]):
+        raise RuntimeError("wrong mapping name!") 
+    
+    if mapping_type == "clause_wise":
+        W, B, C = clause_wise_qubo_3sat_map(clauses, mapping_name)
+    else:
+        W, B, C = shared_qubo_3sat_map(clauses, mapping_name)
+
+    return W, B, C
+
+
+def shared_qubo_3sat_map(clauses: t.List[t.List[int]], mapping_name) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    
+    num_vars = len(np.unique(abs(np.array(clauses))))
+    num_clauses = len(clauses)
+
+    cl = -np.array(clauses)            #invert the clauses to map to energy
+    cl_idx =  np.abs(cl) - np.full_like(cl, 1) #count the variables from 0
+
+    W1 = np.zeros((num_vars, num_vars))
+    B1 = np.zeros(num_vars)
+    C = np.zeros(1)
+    
+    for i in range(num_clauses):
+        if cl[i, 0] > 0: 
+            if cl[i, 1] > 0: 
+                if cl[i, 2] > 0:
+                    pass
+                else:
+                    W1[cl_idx[i,0], cl_idx[i,1]] += 1
+
+            else:
+                if cl[i, 2] > 0:
+                    W1[cl_idx[i,0], cl_idx[i,2]] += 1
+                else:
+                    W1[cl_idx[i,0], cl_idx[i,1]] -= 1
+                    W1[cl_idx[i,0], cl_idx[i,2]] -= 1
+
+                    B1[cl_idx[i,0]] += 1
+            
+        else:
+            if cl[i,  1] > 0: 
+                if cl[i, 2] > 0: 
+                    W1[cl_idx[i,1], cl_idx[i,2]] += 1
+                else:
+                    W1[cl_idx[i,0], cl_idx[i,1]] -= 1
+                    W1[cl_idx[i,1], cl_idx[i,2]] -= 1
+
+                    B1[cl_idx[i,1]] += 1
+                
+            else:
+                if cl[i,2] > 0: 
+                    W1[cl_idx[i,0], cl_idx[i,2]] -= 1
+                    W1[cl_idx[i,1], cl_idx[i,2]] -= 1
+
+                    B1[cl_idx[i,2]] += 1
+                else:
+                    W1[cl_idx[i,0], cl_idx[i,1]] += 1
+                    W1[cl_idx[i,0], cl_idx[i,2]] += 1
+                    W1[cl_idx[i,1], cl_idx[i,2]] += 1
+
+                    B1[cl_idx[i,0]] -= 1
+                    B1[cl_idx[i,1]] -= 1
+                    B1[cl_idx[i,2]] -= 1
+
+                    C += 1 
+    
+    count3 = np.full(num_clauses, 1)
+
+    #take into account repeating 3rd order terms
+    for i in range(num_clauses):
+        if count3[i] == 0:
+            continue
+        c1 = np.sort(cl_idx[i, :])
+
+        first_match = True
+        for j in range(i+1, num_clauses):
+            if count3[j] == 0:
+                continue
+            c2 = np.sort(cl_idx[j, :])
+            if (c1 == c2).all():
+                if first_match:
+                    if np.prod(cl[i, :]) > 0:
+                        count3[i] = 1
+                    else:
+                        count3[i] = -1
+                    first_match = False
+                
+                if np.prod(cl[j, :]) > 0:
+                    count3[i] += 1
+                else:
+                    count3[i] -= 1
+                
+                count3[j] = 0
+
+    pairs_matrix = np.zeros((num_vars, num_vars), dtype=int)
+    for i in range(num_clauses):
+        if count3[i] != 0:
+            pairs_matrix[cl_idx[i, 0], cl_idx[i, 1]] += 1
+            pairs_matrix[cl_idx[i, 0], cl_idx[i, 2]] += 1
+            pairs_matrix[cl_idx[i, 1], cl_idx[i, 2]] += 1
+    
+    pairs_matrix += np.transpose(pairs_matrix)
+
+    pair_count = []
+    for i in range(num_vars):
+        for j in range(i+1, num_vars):
+            if pairs_matrix[i, j] > 0:
+                pair_count.append([np.array([i, j]), pairs_matrix[i, j]])
+
+    pair_count = sorted(pair_count, key = lambda p: p[1], reverse=True)
+
+    shared_pairs = []
+    track_clauses = np.full(num_clauses, 1)
+
+    for i in range(num_clauses):
+        if i == 45:
+            pass
+        if track_clauses[i] == 0 or count3[i] == 0:
+            continue
+        
+        c01 = np.sort([cl_idx[i, 0], cl_idx[i, 1]])
+        c02 = np.sort([cl_idx[i, 0], cl_idx[i, 2]])
+        c12 = np.sort([cl_idx[i, 1], cl_idx[i, 2]])
+
+        for k in range(len(pair_count)):
+            save_pair = False
+
+            if (c01 == pair_count[k][0]).all():
+                save_pair = True
+                for l in range(len(pair_count)):
+                    if((c02 == pair_count[l][0]).all() or (c12 == pair_count[l][0]).all()):
+                        pair_count[l][1] -= 1
+
+            if (c02 == pair_count[k][0]).all():
+                save_pair = True
+                for l in range(len(pair_count)):
+                    if((c01 == pair_count[l][0]).all() or (c12 == pair_count[l][0]).all()):
+                        pair_count[l][1] -= 1
+                        
+            if (c12 == pair_count[k][0]).all():
+                save_pair = True
+                for l in range(len(pair_count)):
+                    if((c01 == pair_count[l][0]).all() or (c02 == pair_count[l][0]).all()):
+                        pair_count[l][1] -= 1
+
+            if save_pair:
+                pair_count[k][1] -= 1
+                
+                for j in range(i+1, num_clauses):
+                    if count3[j] == 0 or track_clauses[j] == 0:
+                        continue
+
+                    c01 = np.sort([cl_idx[j, 0], cl_idx[j, 1]])
+                    c02 = np.sort([cl_idx[j, 0], cl_idx[j, 2]])
+                    c12 = np.sort([cl_idx[j, 1], cl_idx[j, 2]])
+
+                    if (c01 == pair_count[k][0]).all():
+                        for l in range(len(pair_count)):
+                            if((c02 == pair_count[l][0]).all() or (c12 == pair_count[l][0]).all()):
+                                pair_count[l][1] -= 1
+                        pair_count[k][1] -= 1
+                        track_clauses[j] = 0
+
+                    if (c02 == pair_count[k][0]).all():
+                        for l in range(len(pair_count)):
+                            if((c01 == pair_count[l][0]).all() or (c12 == pair_count[l][0]).all()):
+                                pair_count[l][1] -= 1
+                        pair_count[k][1] -= 1
+                        track_clauses[j] = 0
+
+                    if (c12 == pair_count[k][0]).all():
+                        for l in range(len(pair_count)):
+                            if((c01 == pair_count[l][0]).all() or (c02 == pair_count[l][0]).all()):
+                                pair_count[l][1] -= 1
+                        pair_count[k][1] -= 1
+                        track_clauses[j] = 0
+
+                shared_pairs.append(pair_count[k][0])
+                if pair_count[k][1] != 0:
+                    raise RuntimeError("Error")
+                
+                pair_count = sorted(pair_count, key = lambda p: p[1], reverse=True)
+
+                break
+    
+    N = num_vars + len(shared_pairs)
+
+    W = np.zeros((N, N))
+    B = np.zeros(N)
+
+    W[:num_vars, :num_vars] = W1
+    B[:num_vars] = B1
+
+    if mapping_name == "Rosenberg":
+        penalty_lb = np.zeros((len(shared_pairs), 3))
+
+    check = 0
+    for i in range(num_clauses):
+        c01 = np.sort([cl_idx[i, 0], cl_idx[i, 1]])
+        c02 = np.sort([cl_idx[i, 0], cl_idx[i, 2]])
+        c12 = np.sort([cl_idx[i, 1], cl_idx[i, 2]])
+    
+        found_pair = False
+        for k in range(len(shared_pairs)):
+            if (c01 == shared_pairs[k]).all():
+                found_pair = True
+                if np.prod(cl[i, :]) > 0:
+                    W[cl_idx[i, 2], num_vars + k] += 1
+                else:
+                    W[cl_idx[i, 2], num_vars + k] -= 1
+
+            if (c02 == shared_pairs[k]).all():
+                found_pair = True
+                if np.prod(cl[i, :]) > 0:
+                    W[cl_idx[i, 1], num_vars + k] += 1
+                else:
+                    W[cl_idx[i, 1], num_vars + k] -= 1
+
+            if (c12 == shared_pairs[k]).all():
+                found_pair = True
+                if np.prod(cl[i, :]) > 0:
+                    W[cl_idx[i, 0], num_vars + k] += 1
+                else:
+                    W[cl_idx[i, 0], num_vars + k] -= 1
+    
+            if found_pair:
+                check += 1
+                if mapping_name == "Rosenberg":
+                    if np.prod(cl[i, :]) > 0:
+                        penalty_lb[k, 0] += 1
+                    else:
+                        penalty_lb[k, 1] += 1
+                    
+                    if penalty_lb[k, 2] <  np.max(penalty_lb[k, :]):
+                        W[shared_pairs[k][0], shared_pairs[k][1]] += 1
+                        W[shared_pairs[k][0], num_vars + k] -= 2
+                        W[shared_pairs[k][1], num_vars + k] -= 2
+                        B[num_vars + k] += 3
+
+                        penalty_lb[k, 2] += 1
+
+                elif mapping_name == "KZFD":
+                    W[shared_pairs[k][0], shared_pairs[k][1]] += 1
+                    W[shared_pairs[k][0], num_vars + k] -= 1
+                    W[shared_pairs[k][1], num_vars + k] -= 1
+                    B[num_vars + k] += 1
+                    
+                    if np.prod(cl[i, :]) < 0:
+                        B[num_vars + k] += 1
+                        W[shared_pairs[k][0], shared_pairs[k][1]] -= 1
+
+                else:
+                    raise RuntimeError("Unknown mapping!")
+                
+                break
+    # print(f"substituted {check} clauses")
+    W += np.transpose(W)
+
+    return W, B, C
+
+
+def clause_wise_qubo_3sat_map(clauses: t.List[t.List[int]], mapping_name) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+    num_vars = len(np.unique(abs(np.array(clauses))))
+    num_clauses = len(clauses)
+
+    N = num_vars + num_clauses
+
+    cl = -np.array(clauses)            #invert the clauses to map to energy
+    cl_idx =  np.abs(cl) - np.full_like(cl, 1) #count the variables from 0
+
+    W = np.zeros((N, N))
+    B = np.zeros(N)
+    C = np.zeros(1)
+
+    for i in range(num_clauses):
+      if cl[i, 2] > 0:
+        W[num_vars + i, cl_idx[i, 2]] = 1
+      else:
+        B[num_vars + i] = 1
+        W[num_vars + i, cl_idx[i, 2]] = -1
+
+    for i in range(num_clauses):
+      if mapping_name == "Rosenberg":
+          B[num_vars + i] += 3
+      else:
+          B[num_vars + i] += 1
+
+      if cl[i, 0] > 0 and cl[i, 1] > 0:
+          W[cl_idx[i, 0], cl_idx[i, 1]] += 1
+
+          if mapping_name == "Rosenberg":
+              W[num_vars + i, cl_idx[i, 0]] -= 2
+              W[num_vars + i, cl_idx[i, 1]] -= 2
+          else:
+              W[num_vars + i, cl_idx[i, 0]] -= 1
+              W[num_vars + i, cl_idx[i, 1]] -= 1
+
+      elif cl[i, 0] > 0 and cl[i, 1] < 0:
+          W[cl_idx[i, 0], cl_idx[i, 1]] -= 1
+          B[cl_idx[i, 0]] += 1
+
+          if mapping_name == "Rosenberg":
+              W[num_vars + i, cl_idx[i, 0]] -= 2
+              W[num_vars + i, cl_idx[i, 1]] += 2
+              B[num_vars + i] -= 2
+          else:
+              W[num_vars + i, cl_idx[i, 0]] -= 1
+              W[num_vars + i, cl_idx[i, 1]] += 1
+              B[num_vars + i] -= 1
+
+      elif cl[i, 0] < 0 and cl[i, 1] > 0:
+          W[cl_idx[i, 0], cl_idx[i, 1]] -= 1
+          B[cl_idx[i, 1]] += 1
+
+          if mapping_name == "Rosenberg":
+              W[num_vars + i, cl_idx[i, 1]] -= 2
+              W[num_vars + i, cl_idx[i, 0]] += 2
+              B[num_vars + i] -= 2
+          else:
+              W[num_vars + i, cl_idx[i, 1]] -= 1
+              W[num_vars + i, cl_idx[i, 0]] += 1
+              B[num_vars + i] -= 1
+
+      else:
+          W[cl_idx[i, 0], cl_idx[i, 1]] += 1
+          B[cl_idx[i, 0]] -= 1
+          B[cl_idx[i, 1]] -= 1
+          C += 1  # add the constant
+
+          if mapping_name == "Rosenberg":
+              W[num_vars + i, cl_idx[i, 0]] += 2
+              W[num_vars + i, cl_idx[i, 1]] += 2
+              B[num_vars + i] -= 4
+          else:
+              W[num_vars + i, cl_idx[i, 0]] += 1
+              W[num_vars + i, cl_idx[i, 1]] += 1
+              B[num_vars + i] -= 2
+
+    W += W.transpose()   
+
+    return W, B, C
