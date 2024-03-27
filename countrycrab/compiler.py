@@ -20,7 +20,7 @@ from pysat.solvers import Minisat22
 from pysat.formula import CNF
 import typing as t
 import math
-# import cupy as cp
+import cupy as cp
 import os
 
 def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
