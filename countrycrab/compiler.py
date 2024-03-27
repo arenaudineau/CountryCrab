@@ -34,6 +34,8 @@ def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
                 break
             clause = [int(x) for x in line.strip().split() if x != '0']
             clauses.append(clause)
+    # clean empty clauses
+    clauses = [l for l in clauses if l]
     return clauses
 
 def count_variables(list_of_lists):
@@ -158,32 +160,37 @@ def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
     params['variables'] = variables
     params['clauses'] = clauses
 
-    if scheduling == "fill_first":
-        var_list = np.arange(variables)
-        num_superTiles = math.ceil(variables/num_wta_inputs)
-        superTile_varIndices = []
-        last_index = 0
-        for i in range(num_superTiles):
-            if variables%num_wta_inputs==0:
-                superTile_varIndices.append(list(var_list[last_index:last_index+num_wta_inputs]))
-                last_index = last_index+num_wta_inputs
-            else:
-                if i<num_superTiles-1:
+    n_cores = params.get("n_cores", 1)
+
+    if n_cores>1:
+        if scheduling == "fill_first":
+            var_list = np.arange(variables)
+            num_superTiles = math.ceil(variables/num_wta_inputs)
+            superTile_varIndices = []
+            last_index = 0
+            for i in range(num_superTiles):
+                if variables%num_wta_inputs==0:
                     superTile_varIndices.append(list(var_list[last_index:last_index+num_wta_inputs]))
                     last_index = last_index+num_wta_inputs
                 else:
-                    superTile_varIndices.append(list(var_list[last_index:]))
-                    last_var = var_list[variables-1]
-                    superTile_varIndices[i].extend([last_var]*(num_wta_inputs-int(variables%num_wta_inputs)))
-    elif scheduling == "vpr":
-        net_filename = vpr_netlist_loc+os.path.basename(instance_name).split(".cnf")[0]+'.net'
-        superTile_varIndices, num_superTiles = read_netlist(net_filename,variables,clauses,num_wta_inputs)
-        for i in range(num_superTiles):
-            if len(superTile_varIndices[i])<num_wta_inputs:
-                diff = num_wta_inputs - len(superTile_varIndices[i])
-                superTile_varIndices[i].extend([superTile_varIndices[i][-1]]*diff)
-                
-    architecture = [ramf_array, ramb_array, superTile_varIndices, num_superTiles]
+                    if i<num_superTiles-1:
+                        superTile_varIndices.append(list(var_list[last_index:last_index+num_wta_inputs]))
+                        last_index = last_index+num_wta_inputs
+                    else:
+                        superTile_varIndices.append(list(var_list[last_index:]))
+                        last_var = var_list[variables-1]
+                        superTile_varIndices[i].extend([last_var]*(num_wta_inputs-int(variables%num_wta_inputs)))
+        elif scheduling == "vpr":
+            net_filename = vpr_netlist_loc+os.path.basename(instance_name).split(".cnf")[0]+'.net'
+            superTile_varIndices, num_superTiles = read_netlist(net_filename,variables,clauses,num_wta_inputs)
+            for i in range(num_superTiles):
+                if len(superTile_varIndices[i])<num_wta_inputs:
+                    diff = num_wta_inputs - len(superTile_varIndices[i])
+                    superTile_varIndices[i].extend([superTile_varIndices[i][-1]]*diff)
+                    
+        architecture = [ramf_array, ramb_array, superTile_varIndices, num_superTiles]
+    else:
+        architecture = [ramf_array, ramb_array]
     return architecture, params
 
 def read_netlist(net_filename,nvar,nclause,num_wta_inputs):
@@ -278,6 +285,7 @@ def qubo_3sat_map(config: t.Dict) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]
     clauses = load_clauses_from_cnf(instance_name)
     for c in clauses:
         if len(c) != 3:
+            print(c)
             raise RuntimeError("3 sat only!")
 
     mapping_type = config["mapping_type"]   #clause_wise or shared   
