@@ -20,7 +20,7 @@ from pysat.solvers import Minisat22
 from pysat.formula import CNF
 import typing as t
 import math
-import cupy as cp
+# import cupy as cp
 import os
 
 def load_clauses_from_cnf(file_path: str) -> t.List[t.List[int]]:
@@ -262,7 +262,7 @@ def read_netlist(net_filename,nvar,nclause,num_wta_inputs):
 
 # QUBO mappings available
 
-# Returns W, B, C of the QUBO energy from 3-SAT cnf (k = 3 SAT only so far)
+# Returns W, B, C of the QUBO energy from 3/4-SAT cnf (k = 3/4 SAT only so far)
 # W is returned as a symmetric matrix, i.e. E = x^T*W*x/2 + Bx + C
     
 # mapping type 1: "clause_wise" mapping introduces an auxiliary variable for each clause of the cnf (Total QUBO size N = N_var + N_clauses)
@@ -272,13 +272,32 @@ def read_netlist(net_filename,nvar,nclause,num_wta_inputs):
 # mapping name 1: "Rosenberg" penalty (observed to be better for parallel updates on uf 3-SAT)
 # mapping name 2: "KZFD" penalty      (observed to be better for single updates on uf 3-SAT)
 
-def qubo_3sat_map(config: t.Dict) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def qubo_sat_map(config: t.Dict) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
     
     instance_name = config["instance"]
     clauses = load_clauses_from_cnf(instance_name)
+
+    clauses_1 = []
+    clauses_2 = []
+    clauses_34 = []
+    use_4sat = False
+
     for c in clauses:
-        if len(c) != 3:
-            raise RuntimeError("3 sat only!")
+        if len(c) > 4:
+            raise RuntimeError("max 4 sat only!")
+
+        elif len(c) == 4:
+            use_4sat = True
+            clauses_34.append(c)
+
+        elif len(c) == 3:
+            clauses_34.append(c)
+
+        elif len(c) == 2:
+            clauses_2.append(c)
+
+        elif len(c) == 1:
+            clauses_1.append(c)
 
     mapping_type = config["mapping_type"]   #clause_wise or shared   
     if not (mapping_type in ["clause_wise", "shared"]):
@@ -288,11 +307,45 @@ def qubo_3sat_map(config: t.Dict) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]
     if not (mapping_name in ["Rosenberg", "KZFD"]):
         raise RuntimeError("wrong mapping name!") 
     
-    if mapping_type == "clause_wise":
-        W, B, C = clause_wise_qubo_3sat_map(clauses, mapping_name)
+    if use_4sat:
+        W, B, C = qubo_4sat_map(clauses_34, mapping_name, mapping_type)
     else:
-        W, B, C = shared_qubo_3sat_map(clauses, mapping_name)
+        if mapping_type == "clause_wise":
+            W, B, C = clause_wise_qubo_3sat_map(clauses_34, mapping_name)
+        else:
+            W, B, C = shared_qubo_3sat_map(clauses_34, mapping_name)
+    
+    for c in clauses_1:
+        if c[0] < 0:
+            B[-c[0]-1] += 1
+        else:
+            B[c[0]-1] += -1
+            C += 1
 
+    for c in clauses_2:
+        if c[0] < 0 and c[1] < 0:
+            W[-c[0]-1, -c[1]-1] += 1
+            W[-c[1]-1, -c[0]-1] += 1
+
+        elif c[0] > 0 and c[1] < 0:
+            W[c[0]-1, -c[1]-1] += -1
+            W[-c[1]-1, c[0]-1] += -1
+            B[-c[1]-1] += 1
+
+        elif c[0] < 0 and c[1] > 0:
+            W[-c[0]-1, c[1]-1] += -1
+            W[c[1]-1, -c[0]-1] += -1
+            B[-c[0]-1] += 1
+
+        else:
+            W[c[0]-1, c[1]-1] += 1
+            W[c[1]-1, c[0]-1] += 1
+
+            B[c[0]-1] += -1
+            B[c[1]-1] += -1
+
+            C += 1
+    
     return W, B, C
 
 
@@ -549,7 +602,7 @@ def shared_qubo_3sat_map(clauses: t.List[t.List[int]], mapping_name) -> t.Tuple[
 
 def clause_wise_qubo_3sat_map(clauses: t.List[t.List[int]], mapping_name) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
-    num_vars = len(np.unique(abs(np.array(clauses))))
+    num_vars = len(np.unique(abs(np.concatenate(clauses, axis=0))))
     num_clauses = len(clauses)
 
     N = num_vars + num_clauses
@@ -626,5 +679,101 @@ def clause_wise_qubo_3sat_map(clauses: t.List[t.List[int]], mapping_name) -> t.T
               B[num_vars + i] -= 2
 
     W += W.transpose()   
+
+    return W, B, C
+
+# Reduces the 4sat problem to 3sat: xa*xb*xc*xd -> xa*xb*y + penalty and 
+# performs quadratization according to the schemes above
+def qubo_4sat_map(clauses: t.List[t.List[int]], mapping_name, mapping_type) -> t.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+    num_vars = len(np.unique(abs(np.concatenate(clauses, axis=0))))
+
+    cl_3sat = []
+    cl_4sat = []
+
+    n_aux = num_vars
+    for c in clauses:
+        if len(c) == 4:
+            n_aux += 1
+            cl_4sat.append(-np.array(c))
+            cl_3sat.append(np.array([c[0], c[1], -n_aux]))
+        else:
+            cl_3sat.append(-np.array(c))
+    
+    N = num_vars + len(cl_4sat)
+
+    W0 = np.zeros((N, N))
+    B0 = np.zeros(N)
+    C0 = np.zeros(1)
+
+    cl_4idx = np.abs(cl_4sat) - np.full_like(cl_4sat, 1) 
+
+    for i in range(len(cl_4sat)):
+      if mapping_name == "Rosenberg":
+          B0[num_vars + i] += 3
+      else:
+          B0[num_vars + i] += 1
+
+      if cl_4sat[i][2] > 0 and cl_4sat[i][3] > 0:
+          W0[cl_4idx[i, 2], cl_4idx[i, 3]] += 1
+
+          if mapping_name == "Rosenberg":
+              W0[num_vars + i, cl_4idx[i, 2]] -= 2
+              W0[num_vars + i, cl_4idx[i, 3]] -= 2
+          else:
+              W0[num_vars + i, cl_4idx[i, 2]] -= 1
+              W0[num_vars + i, cl_4idx[i, 3]] -= 1
+
+      elif cl_4sat[i][2] > 0 and cl_4sat[i][3] < 0:
+          W0[cl_4idx[i, 2], cl_4idx[i, 3]] -= 1
+          B0[cl_4idx[i, 2]] += 1
+
+          if mapping_name == "Rosenberg":
+              W0[num_vars + i, cl_4idx[i, 2]] -= 2
+              W0[num_vars + i, cl_4idx[i, 3]] += 2
+              B0[num_vars + i] -= 2
+          else:
+              W0[num_vars + i, cl_4idx[i, 2]] -= 1
+              W0[num_vars + i, cl_4idx[i, 3]] += 1
+              B0[num_vars + i] -= 1
+
+      elif cl_4sat[i][2] < 0 and cl_4sat[i][3] > 0:
+          W0[cl_4idx[i, 2], cl_4idx[i, 3]] -= 1
+          B0[cl_4idx[i, 3]] += 1
+
+          if mapping_name == "Rosenberg":
+              W0[num_vars + i, cl_4idx[i, 3]] -= 2
+              W0[num_vars + i, cl_4idx[i, 2]] += 2
+              B0[num_vars + i] -= 2
+          else:
+              W0[num_vars + i, cl_4idx[i, 3]] -= 1
+              W0[num_vars + i, cl_4idx[i, 2]] += 1
+              B0[num_vars + i] -= 1
+
+      else:
+          W0[cl_4idx[i, 2], cl_4idx[i, 3]] += 1
+          B0[cl_4idx[i, 2]] -= 1
+          B0[cl_4idx[i, 3]] -= 1
+          C0 += 1
+
+          if mapping_name == "Rosenberg":
+              W0[num_vars + i, cl_4idx[i, 2]] += 2
+              W0[num_vars + i, cl_4idx[i, 3]] += 2
+              B0[num_vars + i] -= 4
+          else:
+              W0[num_vars + i, cl_4idx[i, 2]] += 1
+              W0[num_vars + i, cl_4idx[i, 3]] += 1
+              B0[num_vars + i] -= 2
+
+    W0 += W0.transpose()
+    
+    if mapping_type == "clause_wise":
+        W, B, C = clause_wise_qubo_3sat_map(cl_3sat, mapping_name)
+    else:
+        W, B, C = shared_qubo_3sat_map(cl_3sat, mapping_name)
+
+    W[:N, :N] += W0
+    B[:N] += B0
+    C += C0
 
     return W, B, C
