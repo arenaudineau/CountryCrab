@@ -20,6 +20,7 @@ from pysat.solvers import Minisat22
 from pysat.formula import CNF
 import typing as t
 import math
+import itertools
 import cupy as cp
 import os
 
@@ -787,3 +788,45 @@ def qubo_4sat_map(num_vars: int,
     C += C0
 
     return W, B, C
+
+def compile_pubo(config: t.Dict, params: t.Dict) -> t.List[np.ndarray]:
+    """
+    Generates tensors for PUBO energy associated with a k-SAT problem specified in `config["instance"]`.
+    """
+
+    instance_name = config["instance"]
+    clauses = load_clauses_from_cnf(instance_name)
+
+
+    N = np.max(np.abs(np.ravel(clauses)))
+    K = np.shape(clauses)[1]
+
+    tensors = [np.zeros([N] * k) for k in range(K+1)]
+
+    for k in range(K+1):
+        for clause in map(np.asarray, clauses): # type: ignore
+            clause *= -1  # Invert the clauses to express as energy minimization problem
+
+            lits_idx = np.abs(clause) - 1
+
+            sorting_idx = np.argsort(lits_idx)
+            clause, lits_idx = clause[sorting_idx], lits_idx[sorting_idx]
+
+            for comb in itertools.combinations(range(K), k): # type: ignore
+                complementary_comb = list(set(range(K)).difference(comb))
+
+                comb = np.asarray(comb, dtype=np.int32)
+                complementary_comb = np.asarray(complementary_comb, dtype=np.int32)
+
+                tensors[k][tuple(lits_idx[comb])] += (
+                    np.sign(np.prod(clause[comb]))
+                    * (np.prod(clause[complementary_comb] < 0))
+                )
+
+        # Symetrize tensors of rank > 1
+        if k > 1:
+            perms = list(itertools.permutations(range(k)))     
+            tensors[k] = np.sum([tensors[k].transpose(perm) for perm in perms], axis=0) / len(perms)
+            
+
+    return tensors
