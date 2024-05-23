@@ -798,13 +798,15 @@ def compile_pubo(config: t.Dict, params: t.Dict) -> t.List[np.ndarray]:
     clauses = load_clauses_from_cnf(instance_name)
 
 
-    N = np.max(np.abs(np.ravel(clauses)))
-    K = np.shape(clauses)[1]
+    N = np.max(np.abs(np.concatenate(clauses)))
+    K_max = max(len(c) for c in clauses)
 
-    tensors = [np.zeros([N] * k) for k in range(K+1)]
+    tensors = [np.zeros([N] * k) for k in range(K_max+1)]
 
-    for k in range(K+1):
-        for clause in map(np.asarray, clauses): # type: ignore
+    for k in range(K_max+1):
+        for clause in map(np.asarray, filter(lambda c: k <= len(c), clauses)): # type: ignore
+            K_clause = len(clause)
+
             clause *= -1  # Invert the clauses to express as energy minimization problem
 
             lits_idx = np.abs(clause) - 1
@@ -812,8 +814,8 @@ def compile_pubo(config: t.Dict, params: t.Dict) -> t.List[np.ndarray]:
             sorting_idx = np.argsort(lits_idx)
             clause, lits_idx = clause[sorting_idx], lits_idx[sorting_idx]
 
-            for comb in itertools.combinations(range(K), k): # type: ignore
-                complementary_comb = list(set(range(K)).difference(comb))
+            for comb in itertools.combinations(range(K_clause), k): # type: ignore
+                complementary_comb = list(set(range(K_clause)).difference(comb))
 
                 comb = np.asarray(comb, dtype=np.int32)
                 complementary_comb = np.asarray(complementary_comb, dtype=np.int32)
