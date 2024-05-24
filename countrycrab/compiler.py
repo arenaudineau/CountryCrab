@@ -190,7 +190,9 @@ def compile_walksat_g(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple
                     
         architecture = [ramf_array, ramb_array, superTile_varIndices, num_superTiles]
     else:
-        architecture = [ramf_array, ramb_array]
+        superTile_varIndices = list(np.arange(0,variables,1))
+        num_superTiles = 1
+        architecture = [ramf_array, ramb_array, superTile_varIndices, num_superTiles]
     return architecture, params
 
 def read_netlist(net_filename,nvar,nclause,num_wta_inputs):
