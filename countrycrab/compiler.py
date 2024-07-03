@@ -794,11 +794,14 @@ def qubo_4sat_map(num_vars: int,
 def compile_pubo(config: t.Dict, params: t.Dict) -> t.List[np.ndarray]:
     """
     Generates tensors for PUBO energy associated with a k-SAT problem specified in `config["instance"]`.
+    
+    Parameters:
+        - `params["puso_tensors"]`: If True, express the tensors for bipolar ({-1, 1}) variables instead of binary ({0,1}) variables [False by default]
     """
 
     instance_name = config["instance"]
     clauses = load_clauses_from_cnf(instance_name)
-
+    puso_tensors = params.get("puso_tensors", False)
 
     N = np.max(np.abs(np.concatenate(clauses)))
     K_max = max(len(c) for c in clauses)
@@ -831,6 +834,12 @@ def compile_pubo(config: t.Dict, params: t.Dict) -> t.List[np.ndarray]:
         if k > 1:
             perms = list(itertools.permutations(range(k)))     
             tensors[k] = np.sum([tensors[k].transpose(perm) for perm in perms], axis=0) / len(perms)
+        
+        # Express the tensors for bipolar ({-1, 1}) variables instead of binary ({0,1}) variables
+        if puso_tensors:
+            tensors[k] *= np.power(0.5, k)
             
+            for l in range(k):
+                tensors[l] += math.comb(k, l) * np.sum(tensors[k], axis=tuple(range(l, k)))
 
     return tensors
