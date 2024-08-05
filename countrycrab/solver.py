@@ -19,11 +19,11 @@ import pandas as pd
 import os
 import typing as t
 import json
-
+from inspect import getmembers, isfunction
 
 from countrycrab.compiler import compile_walksat_m, compile_walksat_g
 from countrycrab.analyze import vector_its
-from countrycrab.heuristics import walksat_m, walksat_g, walksat_skc, walksat_b
+import countrycrab.heuristics
 
 import cupy as cp
 
@@ -68,10 +68,9 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     # load the heuristic function from a separate file
     heuristic_name = config.get("heuristic", 'walksat_m')
     heuristics_dict = {
-        'walksat_m': walksat_m,
-        'walksat_g': walksat_g,
-        'walksat_skc': walksat_skc,
-        'walksat_b': walksat_b
+        name: fn
+        for name, fn in getmembers(countrycrab.heuristics, isfunction)
+        if name[0] != "_" # "private" members
     }
     heuristic_function = heuristics_dict.get(heuristic_name)
     if heuristic_function is None:
