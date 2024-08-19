@@ -110,7 +110,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
     #   We stored the violated_constr_mat per iteration (== flip), thus we must decouple the iteration and time per run
     ts = cp.arange(np.nanmin(iterations_timepoints), np.nanmax(iterations_timepoints) + tts_deltatime, tts_deltatime)
     time_to_iter = cp.apply_along_axis( # use apply_along_axis instead of vectorization to prevent needing literal TBs of (V)RAM
-        lambda tps: cp.sum(ts[:, np.newaxis] >= tps, axis=1),
+        lambda tps: cp.sum(ts[:, np.newaxis] >= tps, axis=1) - 1,
         arr = iterations_timepoints,
         axis = 1
     )
@@ -148,7 +148,7 @@ def solve(config: t.Dict, params: t.Dict) -> t.Union[t.Dict, t.Tuple]:
         
         elif task == 'solve':
             if solved:
-                return {"its": its[-2], "opt_tts": np.nanmin(tts)}
+                return {"its": its[-2], "opt_tts": tts[-2]}
             else:
                 return {"its": np.nan, "tts": np.nan}
             
